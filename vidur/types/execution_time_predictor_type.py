@@ -5,3 +5,4 @@ class ExecutionTimePredictorType(BaseIntEnum):
     DUMMY = 1
     RANDOM_FORREST = 2
     LINEAR_REGRESSION = 3
+    HBF_LINEAR_REGRESSION = 4

@@ -215,6 +215,19 @@ class SyntheticRequestGeneratorConfig(BaseRequestGeneratorConfig):
         default=None,
         metadata={"help": "Duration of the synthetic request generator."},
     )
+    decode_only: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "If True, requests start with prefill already complete. "
+                "num_processed_tokens is initialised to num_prefill_tokens so the "
+                "request enters decode immediately, bypassing the prefill queue. "
+                "Use with --sarathi_scheduler_config_num_blocks to override the "
+                "GPU-memory-based block limit when modelling an HBF system where "
+                "KV lives in flash, not GPU SRAM."
+            )
+        },
+    )
 
     def __post_init__(self):
         self.max_tokens = self.length_generator_config.max_tokens
@@ -584,6 +597,66 @@ class LinearRegressionExecutionTimePredictorConfig(BaseExecutionTimePredictorCon
     @staticmethod
     def get_type():
         return ExecutionTimePredictorType.LINEAR_REGRESSION
+
+
+@dataclass
+class HBFLinearRegressionExecutionTimePredictorConfig(
+    LinearRegressionExecutionTimePredictorConfig
+):
+    hbfsim_config_path: str = field(
+        default="",
+        metadata={"help": "Path to the HBFSim TOML config for NAND plane parameters."},
+    )
+    placement_policy: str = field(
+        default="STRIPE_ACROSS_PLANES",
+        metadata={
+            "help": (
+                "KV block placement policy across NAND planes. "
+                "One of: STRIPE_ACROSS_PLANES, PACK_BY_SEQUENCE, INTERLEAVE_BY_TOKEN."
+            )
+        },
+    )
+    hot_kv_fraction: float = field(
+        default=0.0,
+        metadata={
+            "help": (
+                "Fraction of decode sequences whose KV is in HBM (hot tier). "
+                "Remainder is fetched from HBF (cold tier). "
+                "Requires use_ramulator=True for non-zero values."
+            )
+        },
+    )
+    use_ramulator: bool = field(
+        default=False,
+        metadata={"help": "Also simulate the HBM tier with a row-buffer bank scheduler."},
+    )
+    sparsity_fraction: float = field(
+        default=1.0,
+        metadata={
+            "help": (
+                "Fraction of KV blocks to read per (sequence, layer) at each decode step. "
+                "1.0 = dense attention (all blocks). 0.1 = 10%% sparsity (top-K' selection). "
+                "Models query-dependent sparsity where only the most relevant KV blocks are read."
+            )
+        },
+    )
+    hbm_kv_fraction: float = field(
+        default=0.0,
+        metadata={
+            "help": (
+                "Fraction of each sequence's most-recent KV blocks stored in HBM (hot window). "
+                "The remaining (1 - hbm_kv_fraction) cold blocks are fetched from HBF. "
+                "0.0 = all KV in HBF (baseline). 0.0909 ≈ 1:10 HBM:HBF split. "
+                "When > 0, the predictor uses a pipeline model where HBM dense attention "
+                "and HBF sparse reads execute concurrently; effective decode stall = "
+                "max(hbm_dense_attention_time, hbf_sparse_read_time)."
+            )
+        },
+    )
+
+    @staticmethod
+    def get_type():
+        return ExecutionTimePredictorType.HBF_LINEAR_REGRESSION
 
 
 @dataclass

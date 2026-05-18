@@ -4,7 +4,10 @@ from typing import Dict, List
 
 import pandas as pd
 import plotly_express as px
-import wandb
+try:
+    import wandb
+except ImportError:
+    wandb = None
 
 from vidur.config import SimulationConfig
 from vidur.entities import Batch, BatchStage, ExecutionTime, Request
@@ -265,7 +268,7 @@ class MetricsStore:
             [dataseries._to_df() for dataseries in dataseries_list],
         )
         merged_df.to_csv(f"{base_path}/{file_name}.csv", index=False)
-        if wandb.run and self._config.save_table_to_wandb:
+        if wandb and wandb.run and self._config.save_table_to_wandb:
             wand_table = wandb.Table(dataframe=merged_df)
             wandb.log({f"{file_name}_table": wand_table}, step=0)
 
@@ -277,7 +280,7 @@ class MetricsStore:
         y_label: str,
         data: Dict[str, float],
     ):
-        if wandb.run:
+        if wandb and wandb.run:
             wandb.log(
                 {
                     plot_name: wandb.plot.bar(

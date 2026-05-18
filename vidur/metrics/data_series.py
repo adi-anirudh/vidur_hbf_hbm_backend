@@ -4,7 +4,10 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 import plotly_express as px
-import wandb
+try:
+    import wandb
+except ImportError:
+    wandb = None
 
 from vidur.logger import init_logger
 
@@ -90,7 +93,7 @@ class DataSeries:
             f" max: {df[y_name].max()},"
             f" mean: {df[y_name].mean()},"
         )
-        if wandb.run:
+        if wandb and wandb.run:
             wandb.log(
                 {
                     f"{plot_name}_min": df[y_name].min(),
@@ -119,7 +122,7 @@ class DataSeries:
             f" 99th percentile: {df[y_name].quantile(0.99)}"
             f" 99.9th percentile: {df[y_name].quantile(0.999)}"
         )
-        if wandb.run:
+        if wandb and wandb.run:
             wandb.log(
                 {
                     f"{plot_name}_min": df[y_name].min(),
@@ -138,7 +141,7 @@ class DataSeries:
 
     def _save_df(self, df: pd.DataFrame, path: str, plot_name: str) -> None:
         df.to_csv(f"{path}/{plot_name}.csv")
-        if wandb.run and self._save_table_to_wandb:
+        if wandb and wandb.run and self._save_table_to_wandb:
             wand_table = wandb.Table(dataframe=df)
             wandb.log({f"{plot_name}_table": wand_table}, step=0)
 
@@ -181,7 +184,7 @@ class DataSeries:
             indices = (indices + offsets) % len(df)
             df = df.iloc[indices]
 
-        if wandb.run:
+        if wandb and wandb.run:
             wandb_df = df.copy()
             # rename the self._y_name column to y_axis_label
             wandb_df = wandb_df.rename(columns={self._y_name: y_axis_label})
@@ -230,7 +233,7 @@ class DataSeries:
         if self._should_subsample(len(df)):
             df = df.iloc[:: len(df) // self._subsamples]
 
-        if wandb.run:
+        if wandb and wandb.run:
             wandb_df = df.copy()
             # rename the self._y_name column to y_axis_label
             wandb_df = wandb_df.rename(columns={self._y_name: y_axis_label})
@@ -263,7 +266,7 @@ class DataSeries:
 
         self.print_distribution_stats(df, plot_name)
 
-        if wandb.run:
+        if wandb and wandb.run:
             # wandb histogram is highly inaccurate so we need to generate the histogram
             # ourselves and then use wandb bar chart
             histogram_df = (
@@ -317,7 +320,7 @@ class DataSeries:
         if self._should_subsample(len(df)):
             df = df.iloc[:: len(df) // self._subsamples]
 
-        if wandb.run:
+        if wandb and wandb.run:
             wandb.log(
                 {
                     f"{plot_name}_differential": wandb.plot.line(

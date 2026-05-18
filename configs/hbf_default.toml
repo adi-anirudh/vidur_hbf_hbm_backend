@@ -1,0 +1,40 @@
+# HBF stack config — 1 stack, 8 SLC dies, 96 planes/die
+# Peak read BW = 768 planes x 4 KB / 4096 ns = 768 GB/s
+# Capacity     = 768 planes x 256 blocks x 256 pages x 4 KB = 206 GB
+
+[nand_media]
+# Organization — tune these to model different BW / capacity configurations.
+# BW = num_planes x page_size_bytes / tR_ns
+page_size_bytes        = 4096   # fixed by NAND process
+pages_per_block        = 256
+blocks_per_plane       = 256    # capacity knob
+num_planes_per_die     = 96     # BW knob
+num_subarrays_per_die  = 96     # internal scheduler unit (1 per plane)
+num_dies_per_stack     = 8      # BW knob
+max_plane_batch        = 96     # planes that can merge into one multi-plane cmd
+enable_multi_plane_cmds = true
+queue_depth            = 8
+
+# Physical SLC NAND timing (ns) — do not change for BW tuning.
+# tR_ns is I/O-gated: page_size / (peak_bw / num_planes) = 4096 B / 1 GB/s = 4096 ns.
+tR_ns    = 4096     # page read latency
+tRC_ns   = 30       # cache read / internal sense shortcut; dominated by I/O
+tPROG_ns = 100000   # page program — ~100 us SLC
+tBERS_ns = 1000000  # block erase  — ~1 ms SLC
+
+[hbm_media]
+num_banks        = 128
+bandwidth_GBps   = 1024.0
+# HBM row-buffer timing in cycles; freq_mhz sets the HBM controller clock.
+tCL_cycles       = 14
+tRCD_cycles      = 14
+tRP_cycles       = 14
+freq_mhz         = 1000.0
+
+[logic_die]
+num_channels         = 1
+num_dies_per_stack   = 8
+
+[address_mapping]
+num_channels = 1
+num_stacks   = 1

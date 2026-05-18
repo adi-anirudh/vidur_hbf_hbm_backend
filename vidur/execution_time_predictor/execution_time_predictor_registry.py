@@ -1,3 +1,6 @@
+from vidur.execution_time_predictor.hbf_execution_time_predictor import (
+    HBFLinearRegressionExecutionTimePredictor,
+)
 from vidur.execution_time_predictor.linear_regression_execution_time_predictor import (
     LinearRegressionExecutionTimePredictor,
 )
@@ -19,4 +22,8 @@ ExecutionTimePredictorRegistry.register(
 )
 ExecutionTimePredictorRegistry.register(
     ExecutionTimePredictorType.LINEAR_REGRESSION, LinearRegressionExecutionTimePredictor
+)
+ExecutionTimePredictorRegistry.register(
+    ExecutionTimePredictorType.HBF_LINEAR_REGRESSION,
+    HBFLinearRegressionExecutionTimePredictor,
 )

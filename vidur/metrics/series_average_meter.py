@@ -1,6 +1,9 @@
 import json
 
-import wandb
+try:
+    import wandb
+except ImportError:
+    wandb = None
 
 from vidur.logger import init_logger
 
@@ -90,7 +93,7 @@ class SeriesAverageMeter:
         with open(f"{path}/{name}.json", "w") as f:
             json.dump(stats_dict, f)
 
-        if wandb.run:
+        if wandb and wandb.run:
             wandb.log(
                 {
                     f"{name}_min": self._min_y,

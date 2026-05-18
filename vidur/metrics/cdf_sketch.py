@@ -1,7 +1,10 @@
 import numpy as np
 import pandas as pd
 import plotly_express as px
-import wandb
+try:
+    import wandb
+except ImportError:
+    wandb = None
 from ddsketch.ddsketch import DDSketch
 
 from vidur.logger import init_logger
@@ -60,7 +63,7 @@ class CDFSketch:
             f" count: {self._sketch._count}"
             f" sum: {self._sketch.sum}"
         )
-        if wandb.run:
+        if wandb and wandb.run:
             wandb.log(
                 {
                     f"{plot_name}_min": self._sketch._min,
@@ -105,7 +108,7 @@ class CDFSketch:
     def _save_df(self, df: pd.DataFrame, path: str, plot_name: str) -> None:
         df.to_csv(f"{path}/{plot_name}.csv")
 
-        if wandb.run and self._save_table_to_wandb:
+        if wandb and wandb.run and self._save_table_to_wandb:
             wand_table = wandb.Table(dataframe=df)
             wandb.log({f"{plot_name}_table": wand_table}, step=0)
 
@@ -120,7 +123,7 @@ class CDFSketch:
 
         self.print_distribution_stats(plot_name)
 
-        if wandb.run:
+        if wandb and wandb.run:
             wandb_df = df.copy()
             # rename the self._metric_name column to x_axis_label
             wandb_df = wandb_df.rename(columns={self._metric_name: x_axis_label})

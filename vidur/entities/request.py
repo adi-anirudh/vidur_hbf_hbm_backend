@@ -32,6 +32,7 @@ class Request(BaseEntity):
         num_prefill_tokens: int,
         num_decode_tokens: int,
         num_processed_tokens: int = 0,
+        prefill_complete: bool = False,
     ):
         self._id = Request.generate_id()
         self._arrived_at = arrived_at
@@ -58,6 +59,10 @@ class Request(BaseEntity):
         self._is_prefill_complete = False
 
         self._num_restarts = 0
+
+        if prefill_complete:
+            self._is_prefill_complete = True
+            self._num_processed_tokens = num_prefill_tokens
 
     @property
     def size(self) -> Tuple[int, int]:

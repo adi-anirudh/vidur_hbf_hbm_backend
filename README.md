@@ -1,168 +1,205 @@
-# Vidur: LLM Inference System Simulator
+# Vidur HBF/HBM Memory Backend
 
-Vidur is a high-fidelity and extensible LLM inference system simulator. It can help you with:
+A plane-accurate NAND flash (HBF) and HBM memory backend for [Vidur](https://github.com/microsoft/vidur), a simulator for LLM inference. Models a High Bandwidth Flash stack stacked on the compute die — the same physical form-factor as HBM, but using NAND flash cells for ~10× higher capacity at the cost of higher read latency.
 
-1. Study the system performance of models under different workloads and configurations.
+The backend replaces Vidur's analytical bandwidth/latency formulas with a cycle-accurate plane scheduler that models multi-plane command merging, page-buffer cache-read shortcuts (tRC), program suspend/resume, and configurable KV placement policies. It is validated against the HBFSim C++ simulator.
 
-    | TTFT | TPOT | Request E2E Time | Batch Size |
-    | --- | --- | --- | --- |
-    | ![TTFT](./assets/prefill_e2e_time.png) | ![TPOT](./assets/decode_time_execution_plus_preemption_normalized.png) | ![Request E2E Time](./assets/request_e2e_time.png) | ![Batch Size](./assets/batch_size.png) |
+---
 
-    *`Llama-3-8B` running the [AzureLLMInferenceTrace2023_conv](https://github.com/Azure/AzurePublicDataset/blob/master/data/AzureLLMInferenceTrace_conv.csv) trace on single `A100 80GB` at 6.45 QPS*
+## Motivation
 
-1. Capacity planning and finding the best deployment configuration for your LLM deployments.
-   ![Config Search](./assets/llama70b_Chat1M_ttft_tbt_90_99_2.0_0.2.jpeg)
-*Capacity per dollar for different deployment configurations vs TTFT-P90 and TBT-P99 for LLaMA2-70B.*
-1. Quickly test new research ideas like new scheduling algorithms, optimizations like speculative decoding, etc.
+Long-context LLM inference (100K–1M tokens) requires storing KV caches that far exceed GPU HBM capacity. HBF provides a memory tier between HBM and DRAM/SSD:
 
-... all without access to GPUs except for a quick initial profiling phase 🎉. We highly recommend checking out our [MLSys'24 paper](https://arxiv.org/abs/2405.05465) and [talk](https://mlsys.org/virtual/2024/poster/2667) for more details.
+| Memory | BW | Capacity | Latency |
+|---|---|---|---|
+| HBM | 3 TB/s | ~80 GB | ~100 ns |
+| **HBF (this work)** | **~768 GB/s** | **~200 GB** | **~4 µs/page** |
+| DRAM | 50 GB/s | ~TB | ~100 ns |
+| NVMe SSD | 7 GB/s | ~TB | ~100 µs |
 
+With sparsity-aware scheduling (query-dependent top-K attention), only a fraction of KV blocks need to be fetched from flash per decode step, making HBF competitive with HBM for long-context decode throughput.
 
-## Supported Models
+---
 
-__Instructions on adding a new model to existing or new SKUs can be found [here](docs/profiling.md)__.
+## Architecture
 
-| Model / Device | A100 80GB DGX | H100 DGX | 4xA100 80GB Pairwise NVLink Node | 8xA40 Pairwise NVLink Node |
-| --- | --- | --- | --- | --- |
-| `meta-llama/Meta-Llama-3-8B` | ✅ | ❌ | ✅ | ❌ |
-| `meta-llama/Meta-Llama-3-70B` | ✅ | ❌ | ✅ | ❌ |
-| `meta-llama/Llama-2-7b-hf` | ✅ | ✅ | ✅ | ✅ |
-| `codellama/CodeLlama-34b-Instruct-hf"` | ✅ | ✅ | ✅ | ✅ |
-| `meta-llama/Llama-2-70b-hf` | ✅ | ✅ | ✅ | ✅ |
-| `internlm/internlm-20b` | ✅ | ✅ | ✅ | ✅ |
-| `Qwen/Qwen-72B` | ✅ | ✅ | ✅ | ✅ |
-
-* All models support a maximum context length of 4k except `Llama3-8B` and `Llama3-70B` which support 16k context length by passing additional CLI params:
-
-    ```text
-    --random_forrest_execution_time_predictor_config_prediction_max_prefill_chunk_size 16384 \
-    --random_forrest_execution_time_predictor_config_prediction_max_batch_size 512 \
-    --random_forrest_execution_time_predictor_config_prediction_max_tokens_per_request 16384
-    ```
-
-* Pipeline parallelism is supported for all models. The PP dimension should divide the number of layers in the model.
-* In DGX nodes, there are 8 GPUs, fully connected via NVLink. So TP1, TP2, TP4 and TP8 are supported.
-* In 4x pairwise NVLink nodes, there are 4 GPUs, so TP1, TP2 and TP4 are supported. TP4 here is less performant than TP4 in DGX nodes because (GPU1, GPU2) are connected via NVLink and (GPU3, GPU4) are connected via NVLink. but between these layers, the interconnect is slower.
-* You can use any combination of TP and PP. For example, you can run LLaMA2-70B on TP2-PP2 on a 4xA100 80GB Pairwise NVLink Node.
-
-## Setup
-
-### Using `mamba`
-
-To run the simulator, create a mamba environment with the given dependency file.
-
-```sh
-mamba env create -p ./env -f ./environment.yml
-mamba env update -f environment-dev.yml
+```
+┌─────────────────────────────────────────────────────────┐
+│                  HBFLinearRegressionPredictor            │
+│  (hbf_execution_time_predictor.py)                       │
+│  • computes per-plane KV read counts analytically        │
+│  • submits aggregate reads to HBFSimBackend              │
+│  • models HBM hot-window + HBF cold-window pipeline      │
+└───────────────────┬─────────────────────────────────────┘
+                    │ submit_plane_reads / submit_decode_step
+┌───────────────────▼─────────────────────────────────────┐
+│                  HBFSimBackend  (backend.py)             │
+│  • maps logical KV block IDs → physical NAND addresses  │
+│  • wraps PlaneScheduler + PlaneAddressMapper             │
+│  • optionally emits HBFSim-compatible trace files        │
+└───────┬────────────────────────────┬────────────────────┘
+        │                            │
+┌───────▼──────────┐   ┌────────────▼────────────────────┐
+│ PlaneAddressMapper│   │      PlaneScheduler              │
+│ (address_mapper) │   │      (plane_scheduler.py)        │
+│                  │   │                                  │
+│ Placement policy:│   │ • serialises ops per subarray    │
+│  STRIPE — best   │   │ • tRC page-buffer cache hits     │
+│   for batch      │   │ • multi-plane command merging    │
+│   decode (max    │   │ • program suspend/resume         │
+│   multi-plane    │   │ • per-plane stall / occupancy    │
+│   merges)        │   │   statistics                     │
+│  PACK — best for │   └──────────────────────────────────┘
+│   prefetch (tRC) │
+│  INTERLEAVE —    │
+│   balanced       │
+└──────────────────┘
 ```
 
-### Using `venv`
+---
 
-1. Ensure that you have Python 3.10 installed on your system. Refer <https://www.bitecode.dev/p/installing-python-the-bare-minimum>
-2. `cd` into the repository root
-3. Create a virtual environment using `venv` module using `python3.10 -m venv .venv`
-4. Activate the virtual environment using `source .venv/bin/activate`
-5. Install the dependencies using `python -m pip install -r requirements.txt`
-6. Run `deactivate` to deactivate the virtual environment
+## Key Files
 
-### Using `conda` (Least recommended)
+| File | Role |
+|---|---|
+| `vidur/memory_backends/hbf/plane_scheduler.py` | Cycle-accurate NAND plane/subarray scheduler |
+| `vidur/memory_backends/hbf/address_mapper.py` | Logical KV block → physical NAND address mapper |
+| `vidur/memory_backends/hbf/backend.py` | `MemoryBackend` implementation; trace emission |
+| `vidur/memory_backends/hbf/config_loader.py` | TOML config parser; `HBFSimConfig` dataclasses |
+| `vidur/execution_time_predictor/hbf_execution_time_predictor.py` | Vidur predictor; HBM+HBF pipeline model |
+| `configs/hbf_default.toml` | Default 768-plane SLC HBF config (768 GB/s, 206 GB) |
+| `run_hbf_simulation.py` | End-to-end simulation runner with sparsity support |
+| `compare_hbfsim.py` | Micro-benchmark comparison against HBFSim C++ |
 
-To run the simulator, create a conda environment with the given dependency file.
+---
 
-```sh
-conda env create -p ./env -f ./environment.yml
-conda env update -f environment-dev.yml
+## Hardware Model
+
+### NAND Timing
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `tR_ns` | 4096 ns | Page read — I/O transfer of `page_size` at 1 GB/s/plane |
+| `tRC_ns` | 30 ns | Cache read — page already in plane's page buffer |
+| `tPROG_ns` | 100 µs | Page program (write) |
+| `tBERS_ns` | 1 ms | Block erase |
+
+**Bandwidth identity:** `BW = n_planes × page_size / tR`. This is preserved across configurations — 768 planes × 4 KB / 4096 ns = 64 planes × 8 MB / 699 µs = **768 GB/s**.
+
+### Page Buffer and tRC
+
+Each plane has a page buffer holding the last-loaded NAND block. When a subsequent read hits the same block, it pays `tRC = 30 ns` instead of `tR`. This matters for the `PACK_BY_SEQUENCE` placement policy where consecutive layer reads within a sequence stay on the same plane and same block.
+
+For long-context sparse decode (`STRIPE_ACROSS_PLANES`), reads from different sequences go to different physical blocks — the page buffer is always cold and tRC never fires. In this regime `tR` dominates and the two models are equivalent.
+
+### Multi-Plane Command Merging
+
+Reads from different planes that share the same `row_offset` (= `page_id = token_id % pages_per_block`) are merged into a single die-level command. All planes execute in parallel and complete at one `tR` cost. This is the primary bandwidth amplification mechanism:
+
+- Batch decode step: all sequences at the same `token_id` → same `row_offset` → up to `num_planes_per_die` reads merged into one command.
+- Peak throughput: `total_planes × page_size / tR` when all planes are occupied.
+
+### Placement Policies
+
+| Policy | CLI | Best for |
+|---|---|---|
+| `STRIPE_ACROSS_PLANES` | `STRIPE` | Large-batch decode — consecutive block IDs round-robin across planes, maximising multi-plane merge parallelism |
+| `PACK_BY_SEQUENCE` | `PACK` | Prefetch pipelines — all KV blocks of a sequence share one plane, enabling tRC cache-read chains within a sequence |
+| `INTERLEAVE_BY_TOKEN` | `INTERLEAVE` | Mixed workloads — distributes by (token_id, layer_id) |
+
+---
+
+## Quick Start
+
+### Install
+
+```bash
+git clone <this repo>
+cd vidur_hbf_hbm_backend
+pip install -e ".[dev]"   # or: uv sync
 ```
 
-### Setting up wandb (Optional)
+### Run a simulation
 
-First, setup your account on `https://<your-org>.wandb.io/` or public wandb, obtain the api key and then run the following command,
-
-```sh
-wandb login --host https://<your-org>.wandb.io
+```bash
+python3 run_hbf_simulation.py \
+    --model meta-llama/Llama-2-70b-hf \
+    --context_length 131072 \
+    --batch_size 16 \
+    --num_requests 64 \
+    --sparsity_fraction 0.1 \
+    --placement_policy STRIPE
 ```
 
-To opt out of wandb, pick any one of the following methods:
+Key arguments:
 
-1. `export WANDB_MODE=disabled` in your shell or add this in `~/.zshrc` or `~/.bashrc`. Remember to reload using `source ~/.zshrc`.
-2. Set `wandb_project` and `wandb_group` as `""` in `vidur/config/default.yml`. Also, remove these CLI params from the shell command with which the simulator is invoked.
+| Argument | Default | Meaning |
+|---|---|---|
+| `--context_length` | 4096 | Max KV context length per request |
+| `--batch_size` | 32 | Decode batch size cap |
+| `--sparsity_fraction` | 1.0 | Fraction of KV blocks fetched per step (1.0 = dense) |
+| `--hbm_kv_fraction` | 0.0 | Fraction of KV cache kept hot in HBM |
+| `--placement_policy` | STRIPE | STRIPE / PACK / INTERLEAVE |
 
-## Running the simulator
+### Run the HBFSim comparison
 
-To run the simulator, execute the following command from the repository root,
+Validates the Python scheduler against the HBFSim C++ offline model on three micro-benchmarks:
 
-```sh
-python -m vidur.main
+```bash
+PYTHONPATH=. python3 compare_hbfsim.py
 ```
 
-or a big example with all the parameters,
+Case A — 4-plane parallel read (multi-plane merge): both models agree at 1×tR  
+Case B — same-plane same-block sequential: both models agree at tR + (N−1)×tRC  
+Case C — same-plane different-blocks (realistic KV): both agree at N×tR  
+Case D — bandwidth invariance: 768×4 KB, 64×8 MB, 1024×16 KB all converge at 2.097 ms
 
-```sh
-python -m vidur.main  \
---replica_config_device a100 \
---replica_config_model_name meta-llama/Meta-Llama-3-8B \
---cluster_config_num_replicas 1 \
---replica_config_tensor_parallel_size 1 \
---replica_config_num_pipeline_stages 1 \
---request_generator_config_type synthetic \
---synthetic_request_generator_config_num_requests 512  \
---length_generator_config_type trace \
---trace_request_length_generator_config_max_tokens 16384 \
---trace_request_length_generator_config_trace_file ./data/processed_traces/splitwise_conv.csv \
---interval_generator_config_type poisson \
---poisson_request_interval_generator_config_qps 6.45 \
---replica_scheduler_config_type sarathi  \
---sarathi_scheduler_config_batch_size_cap 512  \
---sarathi_scheduler_config_chunk_size 512 \
---random_forrest_execution_time_predictor_config_prediction_max_prefill_chunk_size 16384 \
---random_forrest_execution_time_predictor_config_prediction_max_batch_size 512 \
---random_forrest_execution_time_predictor_config_prediction_max_tokens_per_request 16384
+---
+
+## Configuration
+
+Edit `configs/hbf_default.toml` to tune hardware parameters:
+
+```toml
+[nand_media]
+# Bandwidth knobs — BW = num_planes x page_size_bytes / tR_ns
+num_planes_per_die  = 96    # planes per die
+num_dies_per_stack  = 8     # total_planes = planes/die x dies/stack x channels
+page_size_bytes     = 4096  # bytes per NAND page
+tR_ns               = 4096  # read latency (I/O-gated: page_size / BW_per_plane)
+
+# Capacity knob
+blocks_per_plane    = 256   # pages per plane = blocks x pages_per_block
+
+[hbm_media]
+bandwidth_GBps  = 1024.0    # HBM bandwidth (for hot-window pipeline)
 ```
 
-or to get information on all parameters,
+To model HBFSim's `hbf_research_scaled` profile (tR=1 µs, 16 KB pages, 1024 planes):
 
-```sh
-python -m vidur.main -h
+```toml
+[nand_media]
+num_planes_per_die  = 4
+num_dies_per_stack  = 16
+num_subarrays_per_die = 4
+page_size_bytes     = 16384
+tR_ns               = 1000
+tRC_ns              = 30
+pages_per_block     = 512
+
+[logic_die]
+num_channels      = 16
+num_dies_per_stack = 16
 ```
 
-## Simulator Output
+---
 
-* The metrics will be logged to wandb directly and a copy will be stored in the `simulator_output/<TIMESTAMP>` directory. __A description of all the logged metrics can be found [here](docs/metrics.md).__
-* Vidur exports chrome traces of each simulation. The trace can be found in the `simulator_output` directory. The trace can be opened by navigating to `chrome://tracing/` or `edge://tracing/` and loading the trace.
+## Relation to Original Vidur
 
-    ![Chrome Trace](./assets/chrome_trace.png)
+This repo is a fork of [Vidur](https://github.com/microsoft/vidur). All original Vidur schedulers, request generators, and metrics are preserved. The HBF/HBM backend adds:
 
-## Formatting Code
+- `vidur/memory_backends/` — pluggable memory backend interface + HBF and Ramulator backends
+- `vidur/execution_time_predictor/hbf_execution_time_predictor.py` — HBF-aware decode time predictor
+- Modified `vidur/config/config.py`, `vidur/types/` — registration of new predictor type
 
-To format code, execute the following command:
-
-```sh
-make format
-```
-
-## Using Canary Build
-
-We have been working on several improvements for the simulator, including support for prefix caching, different routing policies, reducing memory requirements for the simulator, etc. However, there are some sharp edges that we are working on resolving. In the meantime, if you are looking for support for any of these features, please use the `canary` branch.
-
-## Contributing
-
-This project welcomes contributions and suggestions.  Most contributions require you to agree to a
-Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit https://cla.opensource.microsoft.com.
-
-When you submit a pull request, a CLA bot will automatically determine whether you need to provide
-a CLA and decorate the PR appropriately (e.g., status check, comment). Simply follow the instructions
-provided by the bot. You will only need to do this once across all repos using our CLA.
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
-contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
-
-## Trademarks
-
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft 
-trademarks or logos is subject to and must follow 
-[Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/en-us/legal/intellectualproperty/trademarks/usage/general).
-Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
-Any use of third-party trademarks or logos are subject to those third-party's policies.
-
+The backend is designed to be swappable: the `MemoryBackend` ABC in `vidur/memory_backends/base.py` can be implemented for any memory technology.
