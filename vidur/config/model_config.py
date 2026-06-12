@@ -212,3 +212,84 @@ class Qwen72BModelConfig(QwenModelConfig):
     @staticmethod
     def get_name():
         return "Qwen/Qwen-72B"
+
+
+@dataclass
+class Mistral7BModelConfig(Llama2ModelConfig):
+    num_layers: int = 32
+    num_q_heads: int = 32
+    num_kv_heads: int = 8
+    embedding_dim: int = 4096
+    mlp_hidden_dim: int = 14336
+    max_position_embeddings: int = 32768
+    rope_theta: Optional[float] = 10000
+    vocab_size: int = 128256   # set to match Meta-Llama-3-8B profiling source
+
+    @staticmethod
+    def get_name():
+        return "mistralai/Mistral-7B-v0.1"
+
+
+@dataclass
+class Mixtral8x7BModelConfig(Llama2ModelConfig):
+    num_layers: int = 32
+    num_q_heads: int = 32
+    num_kv_heads: int = 8
+    embedding_dim: int = 4096
+    mlp_hidden_dim: int = 14336   # single-expert hidden dim; uses Meta-Llama-3-8B profiling
+    max_position_embeddings: int = 32768
+    rope_theta: Optional[float] = 1000000
+    vocab_size: int = 128256   # set to match Meta-Llama-3-8B profiling source
+
+    @staticmethod
+    def get_name():
+        return "mistralai/Mixtral-8x7B-v0.1"
+
+
+@dataclass
+class DeepSeek67BModelConfig(Llama2ModelConfig):
+    num_layers: int = 95
+    num_q_heads: int = 64
+    num_kv_heads: int = 8
+    embedding_dim: int = 8192
+    mlp_hidden_dim: int = 28672   # approx (actual 22016); uses Llama-2-70b-hf profiling
+    max_position_embeddings: int = 4096
+    rope_theta: Optional[float] = 10000
+    vocab_size: int = 32768   # set to match Llama-2-70b-hf profiling source
+
+    @staticmethod
+    def get_name():
+        return "deepseek-ai/deepseek-llm-67b-chat"
+
+
+@dataclass
+class Qwen2_72BModelConfig(QwenModelConfig):
+    num_layers: int = 80
+    num_q_heads: int = 64
+    num_kv_heads: int = 8
+    embedding_dim: int = 8192
+    mlp_hidden_dim: int = 28672   # approx (actual ~29568); uses Llama-2-70b-hf profiling
+    max_position_embeddings: int = 131072
+    rope_theta: Optional[float] = 1000000
+    vocab_size: int = 32768   # set to match Llama-2-70b-hf profiling source
+    use_qkv_bias: bool = False
+
+    @staticmethod
+    def get_name():
+        return "Qwen/Qwen2-72B"
+
+
+@dataclass
+class Llama31_405BModelConfig(Llama2ModelConfig):
+    num_layers: int = 126
+    num_q_heads: int = 128
+    num_kv_heads: int = 8
+    embedding_dim: int = 16384
+    mlp_hidden_dim: int = 53248
+    max_position_embeddings: int = 131072
+    rope_theta: Optional[float] = 500000
+    vocab_size: int = 128256
+
+    @staticmethod
+    def get_name():
+        return "meta-llama/Meta-Llama-3.1-405B"

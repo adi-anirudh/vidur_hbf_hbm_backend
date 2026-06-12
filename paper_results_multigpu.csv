@@ -1,0 +1,439 @@
+model,device,num_gpus,batch,ctx,baseline,hbm_frac,simulated,ttft_p50,ttft_p99,tpot_p50,tpot_p99,throughput_tps,flash_stall_ms,note
+microsoft/phi-2,a100,8,128,32768,NaiveSparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,8,128,32768,Dense,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,8,64,65536,Dense,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,8,64,65536,NaiveSparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,8,128,32768,Sparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,8,64,65536,Sparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,2,128,8192,Sparse,0.4383,True,-54.228452211937125,-1.04538912631754,85.74851709948447,88.31006000785386,1402.6332159803198,0.0,sim 3257s TP=2
+microsoft/phi-2,a100,8,32,131072,Dense,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,8,32,131072,NaiveSparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,8,32,131072,Sparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,2,128,8192,NaiveSparse,0.4383,True,-54.228452211937125,-1.04538912631754,129.70569412285576,133.86537687285576,935.557580516861,363.32,sim 3343s TP=2
+microsoft/phi-2,a100,2,64,16384,NaiveSparse,0.4383,True,-25.60936564091922,-1.020060287274801,127.76827083958894,129.51880221458896,494.6236928761914,659.81,sim 3445s TP=2
+microsoft/phi-2,a100,2,32,32768,Dense,0.4383,True,-10.014941450566031,-1.020060287274801,127.31017176455295,127.31017176455295,251.60661788364297,800.98,sim 3586s TP=2
+microsoft/phi-2,a100,2,8,131072,Sparse,0.4383,True,-1.6195993760626193,-1.020060287274801,14.139130873138862,14.139130873138862,570.9545430573801,0.0,sim 2340s TP=2
+microsoft/phi-2,a100,2,4,262144,Sparse,0.4383,True,-1.04538912631754,-1.020060287274801,12.34592675856447,12.34592675856447,327.3745913532979,11.71,sim 166s TP=2
+microsoft/phi-2,a100,2,64,16384,Dense,0.4383,True,-25.60936564091922,-1.020060287274801,115.39373514608529,129.9774256187404,492.8767067775468,660.32,sim 3633s TP=2
+microsoft/phi-2,a100,8,16,262144,Dense,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,8,16,262144,NaiveSparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,8,16,262144,Sparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,2,16,65536,Sparse,0.4383,True,-6.400605561827242,-1.020060287274801,18.674577806472143,19.700796695793933,817.4405369125169,0.0,sim 3660s TP=2
+microsoft/phi-2,a100,2,32,32768,Sparse,0.4383,True,-10.014941450566031,-1.020060287274801,27.187760271984335,27.187760271984335,1182.5462353254247,0.0,sim 3673s TP=2
+microsoft/phi-2,a100,2,4,262144,NaiveSparse,0.4383,True,-1.04538912631754,-1.020060287274801,125.73119155023116,125.73119155023116,31.846199666754238,918.79,sim 368s TP=2
+microsoft/phi-2,a100,2,16,65536,Dense,0.4383,True,-6.400605561827242,-1.020060287274801,124.02184117523115,125.77109267523115,127.34434457802327,848.53,sim 3785s TP=2
+microsoft/phi-2,a100,2,4,262144,Dense,0.4383,True,-1.04538912631754,-1.020060287274801,125.73119155023116,125.73119155023116,31.846199666754238,918.79,sim 608s TP=2
+microsoft/phi-2,a100,2,8,131072,Dense,0.4383,True,-1.6195993760626193,-1.020060287274801,125.75153430023111,125.75153430023111,63.682085394448315,892.9,sim 2761s TP=2
+microsoft/phi-2,a100,8,8,524288,Dense,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,8,8,524288,NaiveSparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,8,8,524288,Sparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,2,128,8192,Dense,0.4383,True,-54.228452211937125,-1.04538912631754,129.69409945618915,133.85378220618915,935.6312364694093,363.26,sim 4108s TP=2
+microsoft/phi-2,a100,4,32,65536,Sparse,0.4462,True,-10.014941450566031,-1.020060287274801,18.56448923728021,19.7104306819411,1634.0767801299585,0.0,sim 4144s TP=4
+microsoft/phi-2,a100,2,2,524288,Sparse,0.4383,True,-1.020060287274801,-1.020060287274801,12.349198425231142,12.349198425231142,163.6434776588417,19.23,sim 551s TP=2
+microsoft/phi-2,a100,4,64,32768,Sparse,0.4462,True,-25.60936564091922,-1.020060287274801,28.178235399196147,30.88074029804175,2081.082027864257,0.0,sim 4232s TP=4
+microsoft/phi-2,a100,2,8,131072,NaiveSparse,0.4383,True,-1.6195993760626193,-1.020060287274801,125.75153430023111,125.75153430023111,63.682085394448315,892.9,sim 2996s TP=2
+microsoft/phi-2,a100,2,16,65536,NaiveSparse,0.4383,True,-6.400605561827242,-1.020060287274801,124.02158517523115,125.77083667523115,127.34460404386547,848.56,sim 4236s TP=2
+microsoft/phi-2,a100,8,4,1048576,Dense,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,8,4,1048576,NaiveSparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,8,4,1048576,Sparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a100,2,2,524288,NaiveSparse,0.4383,True,-1.020060287274801,-1.020060287274801,124.69982216090936,124.69982216090936,16.054931675794894,918.04,sim 594s TP=2
+microsoft/phi-2,a100,4,128,16384,Sparse,0.4462,True,-54.228452211937125,-1.04538912631754,50.9282282276373,53.288403689236816,2329.247687522457,0.0,sim 4266s TP=4
+microsoft/phi-2,a100,2,32,32768,NaiveSparse,0.4383,True,-10.014941450566031,-1.020060287274801,127.30829976455296,127.30829976455296,251.6103213327285,800.96,sim 4286s TP=2
+microsoft/phi-2,a100,2,64,16384,Sparse,0.4383,True,-25.60936564091922,-1.020060287274801,43.27966644935152,47.416777580376014,1353.372550259711,0.0,sim 4303s TP=2
+microsoft/phi-2,a100,4,128,16384,Dense,0.4462,True,-54.228452211937125,-1.04538912631754,122.45193003356724,130.32179715856722,969.7942490333429,616.27,sim 4421s TP=4
+microsoft/phi-2,a100,4,4,524288,Sparse,0.4462,True,-1.04538912631754,-1.020060287274801,12.21224864723691,12.21224864723691,330.9959198257564,25.06,sim 561s TP=4
+microsoft/phi-2,a100,2,2,524288,Dense,0.4383,True,-1.020060287274801,-1.020060287274801,124.69982216090936,124.69982216090936,16.054931675794894,918.04,sim 817s TP=2
+microsoft/phi-2,a100,4,4,524288,Dense,0.4462,True,-1.04538912631754,-1.020060287274801,123.82494223057026,123.82494223057026,32.33696810183445,917.97,sim 755s TP=4
+microsoft/phi-2,a100,4,16,131072,Sparse,0.4462,True,-6.400605561827242,-1.020060287274801,12.560040004524089,13.491469449184981,1197.2497455343503,0.0,sim 3046s TP=4
+microsoft/phi-2,a100,4,16,131072,Dense,0.4462,True,-6.400605561827242,-1.020060287274801,120.34990023057026,123.84515685557025,129.32673784206244,882.83,sim 3281s TP=4
+microsoft/phi-2,a100,4,16,131072,NaiveSparse,0.4462,True,-6.400605561827242,-1.020060287274801,120.34990023057026,123.84515685557025,129.32673784206244,882.83,sim 3166s TP=4
+microsoft/phi-2,a100,4,32,65536,NaiveSparse,0.4462,True,-10.014941450566031,-1.020060287274801,119.1632899418978,125.28002881689781,255.6880170888017,844.56,sim 4582s TP=4
+microsoft/phi-2,a100,4,128,16384,NaiveSparse,0.4462,True,-54.228452211937125,-1.04538912631754,122.45235203356725,130.32221915856726,969.7958900142268,616.16,sim 4601s TP=4
+microsoft/phi-2,a100,4,32,65536,Dense,0.4462,True,-10.014941450566031,-1.020060287274801,119.1632899418978,125.28002881689781,255.6880170888017,844.56,sim 4630s TP=4
+microsoft/phi-2,a100,4,4,524288,NaiveSparse,0.4462,True,-1.04538912631754,-1.020060287274801,123.82502223057027,123.82502223057027,32.33694718825785,917.94,sim 900s TP=4
+microsoft/phi-2,a100,4,64,32768,NaiveSparse,0.4462,True,-25.60936564091922,-1.020060287274801,115.22737922941585,127.02595110441584,504.34030710116167,776.62,sim 4720s TP=4
+microsoft/phi-2,a100,4,64,32768,Dense,0.4462,True,-25.60936564091922,-1.020060287274801,115.22737922941585,127.02595110441584,504.34030710116167,776.62,sim 4754s TP=4
+microsoft/phi-2,a100,2,1,1048576,NaiveSparse,0.4383,True,-1.020060287274801,-1.020060287274801,124.69546691090935,124.69546691090935,8.02774650092481,930.85,sim 660s TP=2
+microsoft/phi-2,a100,2,1,1048576,Sparse,0.4383,True,-1.020060287274801,-1.020060287274801,8.33875198381699,8.33875198381699,121.78421996130152,0.0,sim 672s TP=2
+microsoft/phi-2,a100,2,1,1048576,Dense,0.4383,True,-1.020060287274801,-1.020060287274801,124.69546691090935,124.69546691090935,8.02774650092481,930.85,sim 864s TP=2
+microsoft/phi-2,a100,4,2,1048576,Sparse,0.4462,True,-1.020060287274801,-1.020060287274801,12.212237980570244,12.212237980570244,165.49810599073905,30.18,sim 969s TP=4
+microsoft/phi-2,a100,4,2,1048576,NaiveSparse,0.4462,True,-1.020060287274801,-1.020060287274801,122.92661616090933,122.92661616090933,16.286763172748564,915.9,sim 984s TP=4
+microsoft/phi-2,a100,4,8,262144,Sparse,0.4462,True,-1.6195993760626193,-1.020060287274801,12.20884198057024,12.20884198057024,662.1785065751113,17.32,sim 1752s TP=4
+microsoft/phi-2,a100,4,2,1048576,Dense,0.4462,True,-1.020060287274801,-1.020060287274801,122.92661616090933,122.92661616090933,16.286763172748564,915.89,sim 1161s TP=4
+microsoft/phi-2,a100,4,8,262144,NaiveSparse,0.4462,True,-1.6195993760626193,-1.020060287274801,123.83135573057025,123.83135573057025,64.67058314476334,910.3,sim 2158s TP=4
+microsoft/phi-2,a100,4,8,262144,Dense,0.4462,True,-1.6195993760626193,-1.020060287274801,123.83135573057025,123.83135573057025,64.67058314476334,910.3,sim 2270s TP=4
+microsoft/phi-2,h100,8,128,32768,Sparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,8,64,65536,NaiveSparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,8,128,32768,NaiveSparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,8,64,65536,Dense,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,8,128,32768,Dense,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,8,64,65536,Sparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,2,128,8192,Dense,0.4383,True,-54.228452211937125,-1.04538912631754,122.02044168896498,131.651590063965,960.4317907891984,654.53,sim 3824s TP=2
+microsoft/phi-2,h100,8,32,131072,Dense,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,8,32,131072,NaiveSparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,8,32,131072,Sparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,2,128,8192,NaiveSparse,0.4383,True,-54.228452211937125,-1.04538912631754,122.02051502229831,131.6516633972983,960.4314544869947,654.53,sim 3928s TP=2
+microsoft/phi-2,h100,2,8,131072,Dense,0.4383,True,-1.6195993760626193,-1.020060287274801,125.592178894466,125.592178894466,63.76296939508464,922.27,sim 2127s TP=2
+microsoft/phi-2,h100,2,64,16384,NaiveSparse,0.4383,True,-25.60936564091922,-1.020060287274801,116.44420780249088,128.68971417749086,497.8134840079834,809.95,sim 4168s TP=2
+microsoft/phi-2,h100,4,16,131072,Sparse,0.4462,True,-6.400605561827242,-1.020060287274801,11.59333451990983,12.486685225925221,1294.5845104990522,20.71,sim 1936s TP=4
+microsoft/phi-2,h100,2,16,65536,Sparse,0.4383,True,-6.400605561827242,-1.020060287274801,12.261482313628711,13.198453797185362,1224.0888823329956,4.25,sim 3651s TP=2
+microsoft/phi-2,h100,2,128,8192,Sparse,0.4383,True,-54.228452211937125,-1.04538912631754,47.20930908470952,50.722023778161166,2486.9393462636826,0.0,sim 4251s TP=2
+microsoft/phi-2,h100,8,16,262144,Dense,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,8,16,262144,NaiveSparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,8,16,262144,Sparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,2,16,65536,NaiveSparse,0.4383,True,-6.400605561827242,-1.020060287274801,120.37518051946601,125.62019726946602,127.49746645777414,903.63,sim 3731s TP=2
+microsoft/phi-2,h100,4,128,16384,Sparse,0.4462,True,-54.228452211937125,-1.04538912631754,31.326930895134456,35.48994687958481,3619.6597965432125,0.0,sim 4139s TP=4
+microsoft/phi-2,h100,2,64,16384,Sparse,0.4383,True,-25.60936564091922,-1.020060287274801,25.7402424334825,28.479341626407578,2257.349552614969,0.0,sim 4193s TP=2
+microsoft/phi-2,h100,4,16,131072,Dense,0.4462,True,-6.400605561827242,-1.020060287274801,115.02282974192475,123.75955811692475,129.4162793936293,911.07,sim 2159s TP=4
+microsoft/phi-2,h100,2,8,131072,Sparse,0.4383,True,-1.6195993760626193,-1.020060287274801,12.195008686132663,12.195008686132663,662.937579239589,15.02,sim 2217s TP=2
+microsoft/phi-2,h100,2,16,65536,Dense,0.4383,True,-6.400605561827242,-1.020060287274801,120.37514451946602,125.62016126946601,127.49750303289353,903.64,sim 3876s TP=2
+microsoft/phi-2,h100,8,8,524288,Dense,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,8,8,524288,NaiveSparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,8,8,524288,Sparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,2,4,262144,Sparse,0.4383,True,-1.04538912631754,-1.020060287274801,12.193702019465997,12.193702019465997,331.5046848823006,25.97,sim 220s TP=2
+microsoft/phi-2,h100,2,4,262144,Dense,0.4383,True,-1.04538912631754,-1.020060287274801,125.57922014446602,125.57922014446602,31.88477795023081,933.06,sim 624s TP=2
+microsoft/phi-2,h100,2,8,131072,NaiveSparse,0.4383,True,-1.6195993760626193,-1.020060287274801,125.59321356113264,125.59321356113264,63.7624435667839,922.2,sim 2303s TP=2
+microsoft/phi-2,h100,2,64,16384,Dense,0.4383,True,-25.60936564091922,-1.020060287274801,116.45758420308563,128.70309057808564,497.76169382802846,810.19,sim 4441s TP=2
+microsoft/phi-2,h100,2,32,32768,Dense,0.4383,True,-10.014941450566031,-1.020060287274801,119.99895099014554,126.99355686514555,252.23454319882902,877.24,sim 4204s TP=2
+microsoft/phi-2,h100,2,32,32768,Sparse,0.4383,True,-10.014941450566031,-1.020060287274801,16.16106646829511,17.32569259387896,1860.6614530625286,0.0,sim 4191s TP=2
+microsoft/phi-2,h100,8,4,1048576,Dense,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,8,4,1048576,NaiveSparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,8,4,1048576,Sparse,0.4501,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,h100,2,4,262144,NaiveSparse,0.4383,True,-1.04538912631754,-1.020060287274801,125.57910814446602,125.57910814446602,31.884806416150038,933.05,sim 605s TP=2
+microsoft/phi-2,h100,2,32,32768,NaiveSparse,0.4383,True,-10.014941450566031,-1.020060287274801,119.99670843304776,126.99131430804775,252.23900192018974,877.32,sim 4263s TP=2
+microsoft/phi-2,h100,4,128,16384,Dense,0.4462,True,-54.228452211937125,-1.04538912631754,113.88710538786033,128.97109588786032,993.4526167522856,750.98,sim 4388s TP=4
+microsoft/phi-2,h100,4,16,131072,NaiveSparse,0.4462,True,-6.400605561827242,-1.020060287274801,115.02282974192475,123.75955811692475,129.4162793936293,911.07,sim 2404s TP=4
+microsoft/phi-2,h100,4,64,32768,Sparse,0.4462,True,-25.60936564091922,-1.020060287274801,19.451536233618384,21.63888383008093,2975.1699344937097,0.45,sim 4333s TP=4
+microsoft/phi-2,h100,4,64,32768,Dense,0.4462,True,-25.60936564091922,-1.020060287274801,115.48443880975186,126.40911218475188,506.80382291599756,845.34,sim 4396s TP=4
+microsoft/phi-2,h100,4,128,16384,NaiveSparse,0.4462,True,-54.228452211937125,-1.04538912631754,113.88624972119368,128.97024022119368,993.4592144413543,750.98,sim 4537s TP=4
+microsoft/phi-2,h100,4,32,65536,Sparse,0.4462,True,-10.014941450566031,-1.020060287274801,13.421932577830832,15.279840742179559,2111.88597586793,7.7,sim 3641s TP=4
+microsoft/phi-2,h100,2,2,524288,Sparse,0.4383,True,-1.020060287274801,-1.020060287274801,12.197237686132667,12.197237686132667,165.7037875004186,31.56,sim 400s TP=2
+microsoft/phi-2,h100,4,8,262144,Sparse,0.4462,True,-1.6195993760626193,-1.020060287274801,12.122173241924735,12.122173241924735,666.9631481257505,28.45,sim 557s TP=4
+microsoft/phi-2,h100,4,64,32768,NaiveSparse,0.4462,True,-25.60936564091922,-1.020060287274801,115.48095914308519,126.4056325180852,506.81778818804594,845.34,sim 4497s TP=4
+microsoft/phi-2,h100,2,2,524288,NaiveSparse,0.4383,True,-1.020060287274801,-1.020060287274801,124.69982216090936,124.69982216090936,16.054931675794894,931.58,sim 680s TP=2
+microsoft/phi-2,h100,4,4,524288,NaiveSparse,0.4462,True,-1.04538912631754,-1.020060287274801,123.73844749192475,123.73844749192475,32.359595367718455,927.43,sim 625s TP=4
+microsoft/phi-2,h100,4,8,262144,Dense,0.4462,True,-1.6195993760626193,-1.020060287274801,123.74468699192474,123.74468699192474,64.71592407466719,921.43,sim 782s TP=4
+microsoft/phi-2,h100,4,4,524288,Sparse,0.4462,True,-1.04538912631754,-1.020060287274801,12.12574324192474,12.12574324192474,333.38234870603304,34.53,sim 656s TP=4
+microsoft/phi-2,h100,2,2,524288,Dense,0.4383,True,-1.020060287274801,-1.020060287274801,124.69982216090936,124.69982216090936,16.054931675794894,931.58,sim 767s TP=2
+microsoft/phi-2,h100,4,8,262144,NaiveSparse,0.4462,True,-1.6195993760626193,-1.020060287274801,123.74468699192474,123.74468699192474,64.71592407466719,921.43,sim 839s TP=4
+microsoft/phi-2,h100,4,4,524288,Dense,0.4462,True,-1.04538912631754,-1.020060287274801,123.73844749192475,123.73844749192475,32.359595367718455,927.43,sim 722s TP=4
+microsoft/phi-2,h100,2,1,1048576,Dense,0.4383,True,-1.020060287274801,-1.020060287274801,124.69546691090935,124.69546691090935,8.02774650092481,940.58,sim 713s TP=2
+microsoft/phi-2,h100,4,32,65536,NaiveSparse,0.4462,True,-10.014941450566031,-1.020060287274801,114.1652644024807,124.65042952748071,256.98079910272264,889.14,sim 4187s TP=4
+microsoft/phi-2,h100,4,32,65536,Dense,0.4462,True,-10.014941450566031,-1.020060287274801,114.16487151359182,124.65003663859183,256.98160991905723,889.17,sim 4239s TP=4
+microsoft/phi-2,h100,2,1,1048576,Sparse,0.4383,True,-1.020060287274801,-1.020060287274801,7.122532737695863,7.122532737695863,142.95874155601362,0.0,sim 740s TP=2
+microsoft/phi-2,h100,2,1,1048576,NaiveSparse,0.4383,True,-1.020060287274801,-1.020060287274801,124.69546691090935,124.69546691090935,8.02774650092481,940.58,sim 799s TP=2
+microsoft/phi-2,h100,4,2,1048576,Sparse,0.4462,True,-1.020060287274801,-1.020060287274801,12.12567924192474,12.12567924192474,166.69206350808284,36.71,sim 779s TP=4
+microsoft/phi-2,h100,4,2,1048576,Dense,0.4462,True,-1.020060287274801,-1.020060287274801,122.92661616090933,122.92661616090933,16.286763172748564,923.12,sim 854s TP=4
+microsoft/phi-2,h100,4,2,1048576,NaiveSparse,0.4462,True,-1.020060287274801,-1.020060287274801,122.92661616090933,122.92661616090933,16.286763172748564,923.12,sim 849s TP=4
+microsoft/phi-2,a40,8,128,32768,Dense,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,8,64,65536,NaiveSparse,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,8,128,32768,Sparse,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,8,64,65536,Dense,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,8,64,65536,Sparse,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,8,128,32768,NaiveSparse,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,2,128,8192,Sparse,0.2346,True,-54.228452211937125,-1.04538912631754,249.06598255944226,249.06598255944226,514.1832735494172,0.0,sim 3802s TP=2
+microsoft/phi-2,a40,8,32,131072,Dense,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,8,32,131072,NaiveSparse,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,8,32,131072,Sparse,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,2,128,8192,Dense,0.2346,True,-54.228452211937125,-1.04538912631754,249.09525981331782,249.09525981331782,514.1228083923816,0.0,sim 3981s TP=2
+microsoft/phi-2,a40,2,64,16384,NaiveSparse,0.2346,True,-25.60936564091922,-1.020060287274801,172.46000682403562,175.52241007403563,364.89087809201334,365.88,sim 3973s TP=2
+microsoft/phi-2,a40,2,8,131072,Sparse,0.2346,True,-1.6195993760626193,-1.020060287274801,21.64763924638058,21.64763924638058,371.7449366774727,0.0,sim 2174s TP=2
+microsoft/phi-2,a40,2,8,131072,Dense,0.2346,True,-1.6195993760626193,-1.020060287274801,172.24359312873952,172.24359312873952,46.48025762638687,1204.77,sim 2271s TP=2
+microsoft/phi-2,a40,4,128,16384,Sparse,0.2424,True,-54.228452211937125,-1.04538912631754,127.04992585000288,134.49150168731,922.4501120041921,0.0,sim 4011s TP=4
+microsoft/phi-2,a40,4,64,32768,Sparse,0.2424,True,-25.60936564091922,-1.020060287274801,66.87676303514715,70.861498921829,904.7983684508984,0.0,sim 3770s TP=4
+microsoft/phi-2,a40,8,16,262144,Dense,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,8,16,262144,NaiveSparse,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,8,16,262144,Sparse,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,2,32,32768,NaiveSparse,0.2346,True,-10.014941450566031,-1.020060287274801,160.08597166738176,172.32550529238173,185.83259048839443,846.64,sim 3976s TP=2
+microsoft/phi-2,a40,2,8,131072,NaiveSparse,0.2346,True,-1.6195993760626193,-1.020060287274801,172.24359312873952,172.24359312873952,46.48025762638687,1204.77,sim 2303s TP=2
+microsoft/phi-2,a40,2,64,16384,Sparse,0.2346,True,-25.60936564091922,-1.020060287274801,127.29667813142511,129.7752367659219,493.6453602396334,0.0,sim 4094s TP=2
+microsoft/phi-2,a40,2,128,8192,NaiveSparse,0.2346,True,-54.228452211937125,-1.04538912631754,249.1283585721413,249.1283585721413,514.054467955914,0.0,sim 4281s TP=2
+microsoft/phi-2,a40,2,64,16384,Dense,0.2346,True,-25.60936564091922,-1.020060287274801,172.4555720633375,175.5179753133375,364.90010438432995,365.86,sim 4258s TP=2
+microsoft/phi-2,a40,4,32,65536,Sparse,0.2424,True,-10.014941450566031,-1.020060287274801,37.29052238266238,37.29052238266238,861.0711518415968,0.0,sim 3683s TP=4
+microsoft/phi-2,a40,4,128,16384,NaiveSparse,0.2424,True,-54.228452211937125,-1.04538912631754,164.14748726198422,175.73323563698423,710.9553899532588,329.88,sim 4162s TP=4
+microsoft/phi-2,a40,8,8,524288,Dense,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,8,8,524288,NaiveSparse,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,8,8,524288,Sparse,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,2,16,65536,Sparse,0.2346,True,-6.400605561827242,-1.020060287274801,36.382573963840834,36.382573963840834,441.3176302353522,0.0,sim 3823s TP=2
+microsoft/phi-2,a40,2,32,32768,Dense,0.2346,True,-10.014941450566031,-1.020060287274801,160.08542144223708,172.32495506723708,185.83318428212047,846.98,sim 4254s TP=2
+microsoft/phi-2,a40,2,4,262144,Dense,0.2346,True,-1.04538912631754,-1.020060287274801,171.87714404540614,171.87714404540614,23.289714501252075,1240.16,sim 669s TP=2
+microsoft/phi-2,a40,2,16,65536,Dense,0.2346,True,-6.400605561827242,-1.020060287274801,172.27121747187613,172.27121747187613,92.94559764020194,1086.98,sim 4022s TP=2
+microsoft/phi-2,a40,4,64,32768,NaiveSparse,0.2424,True,-25.60936564091922,-1.020060287274801,158.803739476084,172.35010835108397,371.6120863177728,811.91,sim 4119s TP=4
+microsoft/phi-2,a40,8,4,1048576,Dense,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,2,16,65536,NaiveSparse,0.2346,True,-6.400605561827242,-1.020060287274801,172.27224680520948,172.27224680520948,92.94504187531335,1087.52,sim 3992s TP=2
+microsoft/phi-2,a40,8,4,1048576,NaiveSparse,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,8,4,1048576,Sparse,0.2464,True,,,,,,,"FAILED: odels
+    models[""all_reduce""] = self._train_model(
+  File ""/home/adityaan/vidur/vidur/execution_time_predictor/sklearn_execution_time_predictor.py"", line 354, in _train_model
+    raise Exception(f""Training data for model {model_name} is empty"")
+Exception: Training data for model all_reduce is empty"
+microsoft/phi-2,a40,2,4,262144,NaiveSparse,0.2346,True,-1.04538912631754,-1.020060287274801,171.87669604540613,171.87669604540613,23.28977525142031,1240.12,sim 641s TP=2
+microsoft/phi-2,a40,4,64,32768,Dense,0.2424,True,-25.60936564091922,-1.020060287274801,158.80768521676552,172.3540540917655,371.6035726190657,812.18,sim 4189s TP=4
+microsoft/phi-2,a40,4,16,131072,Sparse,0.2424,True,-6.400605561827242,-1.020060287274801,18.883612871257313,19.98735173747443,805.6457964931618,0.0,sim 2548s TP=4
+microsoft/phi-2,a40,2,4,262144,Sparse,0.2346,True,-1.04538912631754,-1.020060287274801,18.369112503739466,18.369112503739466,219.27895089572317,12.13,sim 578s TP=2
+microsoft/phi-2,a40,2,2,524288,Sparse,0.2346,True,-1.020060287274801,-1.020060287274801,14.339799246380432,14.339799246380432,140.72325848240752,0.0,sim 545s TP=2
+microsoft/phi-2,a40,4,4,524288,Sparse,0.2424,True,-1.04538912631754,-1.020060287274801,18.011077402126464,18.011077402126464,223.6689894648039,50.16,sim 534s TP=4
+microsoft/phi-2,a40,4,32,65536,NaiveSparse,0.2424,True,-10.014941450566031,-1.020060287274801,170.11698277472613,170.11698277472613,188.24694855398238,1062.61,sim 4178s TP=4
+microsoft/phi-2,a40,4,8,262144,Sparse,0.2424,True,-1.6195993760626193,-1.020060287274801,18.008191402126464,18.008191402126464,447.41018072104094,30.39,sim 610s TP=4
+microsoft/phi-2,a40,4,16,131072,Dense,0.2424,True,-6.400605561827242,-1.020060287274801,168.3364592354598,170.08455861045982,94.14143101942688,1200.61,sim 2820s TP=4
+microsoft/phi-2,a40,2,32,32768,Sparse,0.2346,True,-10.014941450566031,-1.020060287274801,62.84285570295731,66.49300026960547,482.1782929934077,0.0,sim 4580s TP=2
+microsoft/phi-2,a40,4,16,131072,NaiveSparse,0.2424,True,-6.400605561827242,-1.020060287274801,168.34190990212647,170.09000927712648,94.13841192077422,1200.82,sim 2866s TP=4
+microsoft/phi-2,a40,4,128,16384,Dense,0.2424,True,-54.228452211937125,-1.04538912631754,164.15460489412246,175.74035326912247,710.9816605079284,329.99,sim 4792s TP=4
+microsoft/phi-2,a40,2,2,524288,Dense,0.2346,True,-1.020060287274801,-1.020060287274801,170.77190916090933,170.77190916090933,11.720279018558749,1251.46,sim 770s TP=2
+microsoft/phi-2,a40,4,8,262144,Dense,0.2424,True,-1.6195993760626193,-1.020060287274801,170.07953865212647,170.07953865212647,47.072105861032135,1246.96,sim 971s TP=4
+microsoft/phi-2,a40,2,1,1048576,Sparse,0.2346,True,-1.020060287274801,-1.020060287274801,11.799816611883646,11.799816611883646,85.67285131768406,0.0,sim 682s TP=2
+microsoft/phi-2,a40,4,32,65536,Dense,0.2424,True,-10.014941450566031,-1.020060287274801,170.11862010805947,170.11862010805947,188.24513538269883,1062.88,sim 4509s TP=4
+microsoft/phi-2,a40,4,4,524288,Dense,0.2424,True,-1.04538912631754,-1.020060287274801,169.9312304021265,169.9312304021265,23.556609551790984,1265.52,sim 916s TP=4
+microsoft/phi-2,a40,2,2,524288,NaiveSparse,0.2346,True,-1.020060287274801,-1.020060287274801,170.77190916090933,170.77190916090933,11.720279018558749,1251.46,sim 950s TP=2
+microsoft/phi-2,a40,4,8,262144,NaiveSparse,0.2424,True,-1.6195993760626193,-1.020060287274801,170.07953865212647,170.07953865212647,47.072105861032135,1246.96,sim 1021s TP=4
+microsoft/phi-2,a40,4,2,1048576,Sparse,0.2424,True,-1.020060287274801,-1.020060287274801,12.422699402126467,12.422699402126467,162.665212691418,15.45,sim 669s TP=4
+microsoft/phi-2,a40,4,4,524288,NaiveSparse,0.2424,True,-1.04538912631754,-1.020060287274801,169.9312304021265,169.9312304021265,23.556609551790984,1265.52,sim 1032s TP=4
+microsoft/phi-2,a40,2,1,1048576,NaiveSparse,0.2346,True,-1.020060287274801,-1.020060287274801,170.76755391090933,170.76755391090933,5.860289077760748,1271.74,sim 1047s TP=2
+microsoft/phi-2,a40,2,1,1048576,Dense,0.2346,True,-1.020060287274801,-1.020060287274801,170.76755391090933,170.76755391090933,5.860289077760748,1271.74,sim 1155s TP=2
+microsoft/phi-2,a40,4,2,1048576,NaiveSparse,0.2424,True,-1.020060287274801,-1.020060287274801,168.96473216090936,168.96473216090936,11.845728952499355,1267.79,sim 1063s TP=4
+microsoft/phi-2,a40,4,2,1048576,Dense,0.2424,True,-1.020060287274801,-1.020060287274801,168.96473216090936,168.96473216090936,11.845728952499355,1267.79,sim 1239s TP=4
+microsoft/phi-2,h200,4,64,32768,Sparse,0.8012,True,-25.60936564091922,-1.020060287274801,19.395455184636695,21.58676428586115,2982.395930378332,0.0,sim 3357s TP=4
+microsoft/phi-2,h200,4,128,32768,Sparse,0.4006,True,-54.228452211937125,-1.04538912631754,31.737210242028837,35.90203660120512,3577.964639768536,3.35,sim 3274s TP=4
+microsoft/phi-2,h200,2,128,8192,Sparse,0.7934,True,-54.228452211937125,-1.04538912631754,47.20930908470952,50.722023778161166,2486.9393462636826,0.0,sim 3885s TP=2
+microsoft/phi-2,h200,2,128,8192,Dense,0.7934,True,-54.228452211937125,-1.04538912631754,51.06017370322509,59.056584078225086,2140.344845342457,66.68,sim 3925s TP=2
+microsoft/phi-2,h200,2,64,16384,NaiveSparse,0.7934,True,-25.60936564091922,-1.020060287274801,43.44598095278822,50.75680495278822,1264.0902257249888,178.18,sim 3975s TP=2
+microsoft/phi-2,h200,2,32,32768,Sparse,0.7934,True,-10.014941450566031,-1.020060287274801,16.17324436652731,17.33907156729605,1859.2151150032255,0.0,sim 3809s TP=2
+microsoft/phi-2,h200,4,128,16384,NaiveSparse,0.8012,True,-54.228452211937125,-1.04538912631754,32.38903404584093,39.13737053215936,3281.221469870442,29.25,sim 3901s TP=4
+microsoft/phi-2,h200,4,128,16384,Sparse,0.8012,True,-54.228452211937125,-1.04538912631754,31.325878895134455,35.48909487958481,3619.7470084128795,0.0,sim 4026s TP=4
+microsoft/phi-2,h200,4,128,16384,Dense,0.8012,True,-54.228452211937125,-1.04538912631754,32.39231404584091,39.14016986549267,3280.9860275272094,29.25,sim 4074s TP=4
+microsoft/phi-2,h200,2,64,16384,Sparse,0.7934,True,-25.60936564091922,-1.020060287274801,25.72425710157155,28.465147569670776,2258.480237724471,0.0,sim 4262s TP=2
+microsoft/phi-2,h200,2,8,131072,Dense,0.7934,True,-1.6195993760626193,-1.020060287274801,45.288867770442806,45.288867770442806,177.14258291721367,280.09,sim 438s TP=2
+microsoft/phi-2,h200,4,64,32768,Dense,0.8012,True,-25.60936564091922,-1.020060287274801,41.837660305809045,48.91987105580905,1311.6806685107179,218.7,sim 4136s TP=4
+microsoft/phi-2,h200,2,8,131072,NaiveSparse,0.7934,True,-1.6195993760626193,-1.020060287274801,45.288867770442806,45.288867770442806,177.14258291721367,280.09,sim 458s TP=2
+microsoft/phi-2,h200,2,128,8192,NaiveSparse,0.7934,True,-54.228452211937125,-1.04538912631754,51.04025935637422,59.03666973137422,2141.0484488991315,66.75,sim 4492s TP=2
+microsoft/phi-2,h200,2,32,32768,Dense,0.7934,True,-10.014941450566031,-1.020060287274801,42.74783438016064,48.29447500516064,664.3557126661146,247.85,sim 4235s TP=2
+microsoft/phi-2,h200,4,64,32768,NaiveSparse,0.8012,True,-25.60936564091922,-1.020060287274801,41.84166659248394,48.92387734248394,1311.5729767130535,218.69,sim 4093s TP=4
+microsoft/phi-2,h200,2,8,131072,Sparse,0.7934,True,-1.6195993760626193,-1.020060287274801,10.277503896710419,10.277503896710419,788.1776224960748,0.0,sim 394s TP=2
+microsoft/phi-2,h200,4,64,65536,Sparse,0.4006,True,-25.60936564091922,-1.020060287274801,28.729603738606947,31.777644976860234,2022.1081225762036,81.58,sim 3420s TP=4
+microsoft/phi-2,h200,2,32,32768,NaiveSparse,0.7934,True,-10.014941450566031,-1.020060287274801,42.763192697005124,48.309833322005126,664.1439465181319,247.77,sim 4324s TP=2
+microsoft/phi-2,h200,2,64,16384,Dense,0.7934,True,-25.60936564091922,-1.020060287274801,43.45466402598721,50.76548802598722,1263.8734677134355,178.03,sim 4566s TP=2
+microsoft/phi-2,h200,2,16,65536,NaiveSparse,0.7934,True,-6.400605561827242,-1.020060287274801,41.103082396962044,46.34809914696204,346.16605807732526,268.83,sim 3989s TP=2
+microsoft/phi-2,h200,4,16,131072,Dense,0.8012,True,-6.400605561827242,-1.020060287274801,39.07009638037361,44.393332005373615,361.4526599642852,275.7,sim 520s TP=4
+microsoft/phi-2,h200,2,16,65536,Dense,0.7934,True,-6.400605561827242,-1.020060287274801,41.089637063628714,46.33465381362871,346.26678531141073,269.41,sim 4074s TP=2
+microsoft/phi-2,h200,4,32,65536,Sparse,0.8012,True,-10.014941450566031,-1.020060287274801,12.560580811832072,14.317537541568024,2255.1044632914163,0.0,sim 3833s TP=4
+microsoft/phi-2,h200,4,32,65536,Dense,0.8012,True,-10.014941450566031,-1.020060287274801,39.49989037569623,45.701165375696235,702.1600090230905,251.19,sim 4033s TP=4
+microsoft/phi-2,h200,4,128,32768,NaiveSparse,0.4006,True,-54.228452211937125,-1.04538912631754,253.4454966716475,269.17661179664753,474.31785707365873,1882.63,sim 4171s TP=4
+microsoft/phi-2,h200,4,16,131072,Sparse,0.8012,True,-6.400605561827242,-1.020060287274801,9.04092308039672,9.931480253429115,1631.9914855952113,0.0,sim 413s TP=4
+microsoft/phi-2,h200,2,16,65536,Sparse,0.7934,True,-6.400605561827242,-1.020060287274801,11.723455188952313,12.656953451636095,1276.9918245081433,0.0,sim 4069s TP=2
+microsoft/phi-2,h200,4,32,65536,NaiveSparse,0.8012,True,-10.014941450566031,-1.020060287274801,39.506427977759635,45.70770297775963,702.0592976795053,251.78,sim 4032s TP=4
+microsoft/phi-2,h200,4,32,131072,Sparse,0.4006,True,-10.014941450566031,-1.020060287274801,26.44173375537362,28.36384513037362,1133.2914508811366,119.43,sim 346s TP=4
+microsoft/phi-2,h200,2,4,262144,NaiveSparse,0.7934,True,-1.04538912631754,-1.020060287274801,45.27549306210947,45.27549306210947,88.59752995355095,290.88,sim 370s TP=2
+microsoft/phi-2,h200,2,4,262144,Sparse,0.7934,True,-1.04538912631754,-1.020060287274801,8.915317230043746,8.915317230043746,455.17599256500534,0.0,sim 413s TP=2
+microsoft/phi-2,h200,4,16,131072,NaiveSparse,0.8012,True,-6.400605561827242,-1.020060287274801,39.07009638037361,44.393332005373615,361.4526599642852,275.7,sim 710s TP=4

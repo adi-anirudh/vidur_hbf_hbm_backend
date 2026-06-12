@@ -279,13 +279,22 @@ class SklearnExecutionTimePredictor(BaseExecutionTimePredictor):
         pass
 
     def _get_model_hash(self, model_name: str, df: pd.DataFrame = None) -> str:
-        config_str = str(self.to_dict())
-
-        if df is None:
-            combined_str = f"{config_str}_{model_name}"
-        else:
+        if df is not None:
+            # Model training hash: exclude prediction-range-only fields so the
+            # trained RF model is reused across different context lengths.
+            # Only prediction_max_tokens / prediction_max_prefill_chunk_size change
+            # the prediction TABLE, not the underlying RF model itself.
+            d = dict(self.to_dict())
+            for _k in ("max_tokens", "prediction_max_prefill_chunk_size"):
+                d.pop(_k, None)
+            config_str = str(d)
             df_hash_str = hashlib.md5(df.to_json().encode("utf-8")).hexdigest()
             combined_str = f"{config_str}_{model_name}_{df_hash_str}"
+        else:
+            # Prediction table hash: include all params so each distinct prediction
+            # range (different context lengths) gets its own cached table.
+            config_str = str(self.to_dict())
+            combined_str = f"{config_str}_{model_name}"
 
         return hashlib.md5(combined_str.encode("utf-8")).hexdigest()[0:8]
 

@@ -1,0 +1,8 @@
+SpaKV vs H3 (only baseline in data). Operating point = SLO-max batch.
+Energy model: HBM=2.7 pJ/bit, HBF=8.0 pJ/bit; top-K=0.1
+
+Throughput speedup (all SLO-feasible configs, N=234): geomean=1.33x median=1.00x p25=1.00x p75=1.65x peak=8.2x
+Energy speedup (N=234): geomean=3.35x median=3.63x p25=2.02x p75=5.31x peak=8.3x
+
+Gaps: Llama-3.1-405B has no usable rows; 67B-72B models are SLO-infeasible at long
+context (shown as '--' in tables). NaiveSparse identical to H3; no HBM-only baseline.

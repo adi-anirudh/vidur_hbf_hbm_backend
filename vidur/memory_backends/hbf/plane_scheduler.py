@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import math
 from collections import deque
+
+import numpy as np
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
@@ -355,16 +357,39 @@ class PlaneScheduler:
         pages_per_block = self._sa.pages_per_block
 
         if req.op in (OpType.READ, OpType.PREFETCH):
-            total_ns = 0.0
-            for i in range(num_pages):
-                block = req.addr.block_id + (req.addr.page_id + i) // pages_per_block
-                if block == sa.current_block:
-                    total_ns += self._sa.tRC_ns
-                    self._cache_hits += 1
-                else:
-                    total_ns += self._sa.tR_ns
-                    sa.current_block = block
-                    self._cache_misses += 1
+            # ── Fast path: sequential read from block_id, page 0 ─────────────
+            # submit_plane_reads always issues requests with block_id=0, page_id=0
+            # (token_id=0 → row_offset=0).  For this fully sequential pattern the
+            # hit/miss count is exact and O(1): miss at every block boundary plus
+            # a possible miss on the very first page if the page buffer holds a
+            # different block.  This produces the IDENTICAL result to the loop.
+            if req.addr.page_id == 0:
+                ppb        = pages_per_block
+                base_block = req.addr.block_id
+                full_blks  = num_pages // ppb
+                partial    = num_pages % ppb
+                is_first_hit = (sa.current_block == base_block)
+                num_misses = (full_blks - int(is_first_hit)) + int(partial > 0)
+                num_hits   = num_pages - num_misses
+                total_ns   = num_hits * self._sa.tRC_ns + num_misses * self._sa.tR_ns
+                sa.current_block = base_block + (num_pages - 1) // ppb
+                self._cache_hits   += num_hits
+                self._cache_misses += num_misses
+                return total_ns
+
+            # ── General path: vectorised page-by-page for non-zero page_id ──
+            pages      = np.arange(num_pages, dtype=np.int64)
+            blocks     = req.addr.block_id + (req.addr.page_id + pages) // pages_per_block
+            prev_blks  = np.empty(num_pages, dtype=np.int64)
+            prev_blks[0]  = sa.current_block
+            prev_blks[1:] = blocks[:-1]
+            is_miss        = blocks != prev_blks
+            num_misses     = int(np.sum(is_miss))
+            num_hits       = num_pages - num_misses
+            total_ns       = num_hits * self._sa.tRC_ns + num_misses * self._sa.tR_ns
+            sa.current_block = int(blocks[-1])
+            self._cache_hits   += num_hits
+            self._cache_misses += num_misses
             return total_ns
 
         elif req.op == OpType.WRITE:

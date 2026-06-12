@@ -1,399 +1,292 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3.10
 """
-End-to-end HBF simulation runner with sparsity support.
+HBF simulation runner using cycle-accurate HBFSim overlay.
 
-Runs a Vidur simulation using the HBF plane scheduler for cold KV reads
-and reports both request-level metrics and memory backend plane statistics.
-
-For long-context inference, use --context_length to set the KV context size
-and --sparsity_fraction to enable query-dependent sparsity (e.g. 0.1 = 10%).
+Runs a Vidur simulation with the HbfsimOverlayPredictor wired in.
+The overlay submits KV-cache memory accesses to the cycle-accurate HBFSim
+backend and adds the resulting flash stall to each decode step's execution time.
 
 Usage:
-    python3.9 run_hbf_simulation.py [--context_length C] [--decode_tokens D]
-                                    [--batch_size B] [--num_requests N]
-                                    [--sparsity_fraction S]
-                                    [--placement_policy STRIPE|PACK|INTERLEAVE]
+    python3.10 run_hbf_simulation.py \\
+        --model meta-llama/Meta-Llama-3-8B --device a100 \\
+        --batch_size 32 --context_length 131072 \\
+        --decode_only --qps 1000 --num_requests 64 \\
+        --kv_read_fraction 0.1 --hbm_kv_fraction 0.05 \\
+        --hbfsim_toml configs/hbf_paper.toml
 """
 
 from __future__ import annotations
 
 import argparse
+import math
 import os
 import sys
 import tempfile
 
-# Ensure vidur package is importable from the repo root
-sys.path.insert(0, os.path.dirname(__file__))
+VIDUR_ROOT  = os.path.dirname(os.path.abspath(__file__))
+HBFSIM_ROOT = "/home/adityaan/HBFSim"
+
+for p in (VIDUR_ROOT, HBFSIM_ROOT):
+    if p not in sys.path:
+        sys.path.insert(0, p)
 
 
-def _build_argv(args: argparse.Namespace, output_dir: str, toml_path: str) -> list:
-    """Convert our simple args into the flat SimulationConfig CLI format."""
-    policy_map = {
-        "STRIPE":     "STRIPE_ACROSS_PLANES",
-        "PACK":       "PACK_BY_SEQUENCE",
-        "INTERLEAVE": "INTERLEAVE_BY_TOKEN",
-    }
-    policy = policy_map.get(args.placement_policy.upper(), args.placement_policy)
+# ---------------------------------------------------------------------------
+# Build Vidur SimulationConfig argv
+# ---------------------------------------------------------------------------
 
+def _build_vidur_argv(args: argparse.Namespace, output_dir: str) -> list:
     return [
         "run_hbf_simulation.py",
-        # Model + device
-        "--replica_config_model_name",            args.model,
-        "--replica_config_device",                args.device,
-        "--replica_config_num_pipeline_stages",   "1",
-        "--replica_config_tensor_parallel_size",  "1",
-        # Predictor
-        "--execution_time_predictor_config_type", "hbf_linear_regression",
-        "--h_b_f_linear_regression_execution_time_predictor_config_hbfsim_config_path",
-        toml_path,
-        "--h_b_f_linear_regression_execution_time_predictor_config_placement_policy",
-        policy,
-        "--h_b_f_linear_regression_execution_time_predictor_config_sparsity_fraction",
-        str(args.sparsity_fraction),
-        "--h_b_f_linear_regression_execution_time_predictor_config_hbm_kv_fraction",
-        str(args.hbm_kv_fraction),
-        # Extend sklearn lookup table to cover the full context length
-        "--h_b_f_linear_regression_execution_time_predictor_config_prediction_max_tokens_per_request",
-        str(max(4096, args.context_length)),
-        # Scheduler (Sarathi chunked prefill)
-        "--replica_scheduler_config_type",        "sarathi",
+        "--replica_config_model_name",           args.model,
+        "--replica_config_device",               args.device,
+        "--replica_config_num_pipeline_stages",  "1",
+        "--replica_config_tensor_parallel_size", str(args.tensor_parallel_size),
+        # Use random forest (accurate compute timing), overlay adds flash stall.
+        # prediction_max_tokens_per_request must cover context_length so the
+        # prediction table has entries for all KV cache sizes we encounter.
+        # kv_cache_prediction_granularity is raised for long contexts to keep
+        # the table size manageable (≤ ~2048 KV-size entries).
+        "--execution_time_predictor_config_type", "random_forrest",
+        "--random_forrest_execution_time_predictor_config_num_training_job_threads", "1",
+        "--random_forrest_execution_time_predictor_config_kv_cache_prediction_granularity",
+        str(max(16, args.context_length // 2048)),
+        # Max tokens must be >= ceil((ctx + decode_tokens) / granularity) * granularity
+        # so that every decode-step lookup hits a populated table entry.
+        "--random_forrest_execution_time_predictor_config_prediction_max_tokens_per_request",
+        str(args.context_length + args.decode_tokens + max(16, args.context_length // 2048) + 16),
+        # For TP>1, Sarathi initialises KV across workers with a prefill pass
+        # even in decode-only mode, so the table must cover the chunk size.
+        "--random_forrest_execution_time_predictor_config_prediction_max_prefill_chunk_size",
+        str(min(args.context_length, 4096)),
+        # Sarathi chunked prefill
+        "--replica_scheduler_config_type",         "sarathi",
         "--sarathi_scheduler_config_batch_size_cap", str(args.batch_size),
-        "--sarathi_scheduler_config_chunk_size",  str(min(args.context_length, 4096)),
+        "--sarathi_scheduler_config_chunk_size",   str(min(args.context_length, 4096)),
         "--sarathi_scheduler_config_num_blocks",
         str(args.num_kv_blocks if args.num_kv_blocks > 0
-            else args.batch_size * max(1, -(-args.context_length // 16)) + 1024),
-        # Requests: synthetic, fixed length, Poisson arrivals
-        "--request_generator_config_type",        "synthetic",
-        "--length_generator_config_type",         "fixed",
+            else math.ceil(args.batch_size * math.ceil(args.context_length / 16) / 0.99) + 64),
+        # Requests
+        "--request_generator_config_type",          "synthetic",
+        "--length_generator_config_type",            "fixed",
         "--fixed_request_length_generator_config_prefill_tokens", str(args.context_length),
         "--fixed_request_length_generator_config_decode_tokens",  str(args.decode_tokens),
-        "--interval_generator_config_type",       "poisson",
+        "--interval_generator_config_type",          "poisson",
         "--poisson_request_interval_generator_config_qps", str(args.qps),
         "--synthetic_request_generator_config_num_requests", str(args.num_requests),
         "--synthetic_request_generator_config_decode_only"
         if args.decode_only else
         "--no-synthetic_request_generator_config_decode_only",
         # Metrics
-        "--metrics_config_output_dir",            output_dir,
+        "--metrics_config_output_dir",              output_dir,
         "--no-metrics_config_write_json_trace",
         "--no-metrics_config_store_plots",
         "--no-metrics_config_enable_chrome_trace",
-        "--log_level",                            "warning",
+        "--log_level", "warning",
     ]
 
 
-def _run_simulation(args: argparse.Namespace, toml_path: str, sparsity: float):
-    """Run one simulation and return (simulator, output_dir)."""
-    import copy
-    a = copy.copy(args)
-    a.sparsity_fraction = sparsity
+# ---------------------------------------------------------------------------
+# Build and attach HBFSim overlay
+# ---------------------------------------------------------------------------
+
+def _build_overlay(sim, args):
+    from integration.vidur import (
+        AddressLayout, HbfsimAddrSpace, KvPoolConfig, ModelDims,
+        build_default_overlay,
+    )
+
+    replica = list(sim._cluster.replicas.values())[0]
+    cluster_cfg   = sim._config.cluster_config
+    scheduler_cfg = cluster_cfg.replica_scheduler_config
+
+    dims = ModelDims(
+        num_layers=replica.num_layers,
+        num_q_heads=replica.num_q_heads,
+        num_kv_heads=replica.num_kv_heads,
+        head_dim=replica.attention_head_dim,
+        embedding_dim=replica.embedding_dim,
+        mlp_hidden_dim=replica.mlp_hidden_dim,
+        vocab_size=replica.vocab_size,
+        use_gated_mlp=replica.use_gated_mlp,
+        tensor_parallel_size=replica.num_tensor_parallel_workers,
+    )
+    num_blocks = scheduler_cfg.num_blocks if scheduler_cfg.num_blocks else (
+        math.ceil(args.batch_size * math.ceil(args.context_length / 16) / 0.99) + 64
+    )
+    kv = KvPoolConfig(block_size=scheduler_cfg.block_size, num_blocks=num_blocks)
+
+    # HBF address space: large enough for any (model, ctx, batch) combination.
+    GiB = 1 << 30
+    TiB = 1 << 40
+    addr_space = HbfsimAddrSpace(
+        hbm_base=0x0,          hbm_size=256 * GiB,
+        hbf_base=0x4000000000, hbf_size=16 * TiB,
+    )
+    hbm_kv_blocks = int(num_blocks * args.hbm_kv_fraction)
+    layout = AddressLayout(
+        dims, kv, addr_space,
+        tier_split_hbm_blocks=hbm_kv_blocks,
+        weights_on_hbf_fraction=0.0,
+    )
+
+    # Auto-compute max_drain_cycles if not specified (3× expected flash time).
+    max_dc = args.max_drain_cycles
+    if max_dc <= 0:
+        per_tok_kv = 2 * dims.num_kv_heads * dims.head_dim * 2
+        blk_bytes = kv.block_size * per_tok_kv * dims.num_layers
+        n_blocks_est = math.ceil(args.batch_size * math.ceil(args.context_length / 16))
+        flash_bytes = n_blocks_est * blk_bytes * args.kv_read_fraction
+        flash_cycles = int(flash_bytes / 768e9 * 1e9)  # at 1 GHz
+        max_dc = max(1_000_000_000, flash_cycles * 3)
+
+    overlay = build_default_overlay(
+        hbfsim_config_path=args.hbfsim_toml,
+        dims=dims,
+        kv_pool=kv,
+        layout=layout,
+        base_predictor=None,
+        num_pipeline_stages=replica.num_pipeline_stages,
+        overlap_with_compute=True,
+        emit_attn_weights=False,
+        emit_mlp_weights=False,
+        lazy_allocator=True,
+        kv_read_fraction=args.kv_read_fraction,
+        max_drain_cycles=max_dc,
+    )
+    return overlay, dims, kv
+
+
+def _attach_overlay(sim, overlay):
+    """Swap base predictor into overlay and install in every stage scheduler.
+
+    Also hooks replica_scheduler.free() so overlay's LazyBlockAllocator
+    mirrors Vidur's request lifecycle and returns blocks to the free pool.
+    """
+    for rs in sim._scheduler._replica_schedulers.values():
+        orig_free = rs.free
+        def _hooked_free(*request_ids, _orig=orig_free, _ov=overlay):
+            _orig(*request_ids)
+            for rid in request_ids:
+                _ov.on_request_completed(rid)
+        rs.free = _hooked_free
+
+        for stage_sched in rs._replica_stage_schedulers.values():
+            base = stage_sched._execution_time_predictor
+            overlay._base = base
+            stage_sched._execution_time_predictor = overlay
+
+
+# ---------------------------------------------------------------------------
+# Run
+# ---------------------------------------------------------------------------
+
+def _run(args: argparse.Namespace):
+    import glob, csv as csvmod
 
     output_dir = tempfile.mkdtemp(prefix="hbf_sim_")
-    sys.argv = _build_argv(a, output_dir, toml_path)
+    saved_argv = sys.argv[:]
+    sys.argv = _build_vidur_argv(args, output_dir)
 
-    from vidur.config import SimulationConfig
-    from vidur.simulator import Simulator
-    from vidur.utils.random import set_seeds
-
-    config = SimulationConfig.create_from_cli_args()
-    set_seeds(config.seed)
-
-    simulator = Simulator(config)
-    simulator.run()
-    simulator._write_output()
-    return simulator, output_dir
-
-
-def _print_request_metrics(output_dir: str):
     try:
-        import glob, csv as csvmod
-        req_csvs = glob.glob(f"{output_dir}/**/request_metrics.csv", recursive=True)
-        if not req_csvs:
-            print("  No request_metrics.csv found.")
-            return
-        with open(req_csvs[0]) as f:
-            rows = list(csvmod.DictReader(f))
+        from vidur.config import SimulationConfig
+        from vidur.simulator import Simulator
+        from vidur.utils.random import set_seeds
 
-        def _pct(label, col, scale=1000, unit="ms"):
-            vals = sorted(float(r[col]) for r in rows if r.get(col, ""))
-            if not vals:
-                return
-            n = len(vals)
-            p50 = vals[n // 2]
-            p90 = vals[min(n - 1, int(n * 0.90))]
-            p99 = vals[min(n - 1, int(n * 0.99))]
-            print(f"  {label:42s}  "
-                  f"p50={p50*scale:8.1f}{unit}  "
-                  f"p90={p90*scale:8.1f}{unit}  "
-                  f"p99={p99*scale:8.1f}{unit}")
+        config = SimulationConfig.create_from_cli_args()
+        set_seeds(config.seed)
+        sim = Simulator(config)
 
-        cols = [
-            ("E2E latency",                   "request_e2e_time"),
-            ("Prefill TTFT",                  "prefill_e2e_time"),
-            ("Decode time / token",           "decode_time_execution_plus_preemption_normalized"),
-            ("Scheduling delay",              "request_scheduling_delay"),
-            ("Prefill time (exec+preemption)","prefill_time_execution_plus_preemption"),
-        ]
-        for lbl, col in cols:
-            try:
-                _pct(lbl, col)
-            except Exception:
-                pass
+        overlay, dims, kv = _build_overlay(sim, args)
+        _attach_overlay(sim, overlay)
 
-        # Throughput: reconstruct arrival times from cumulative inter-arrival delays
-        try:
-            by_id = sorted(rows, key=lambda r: int(r["Request Id"]))
-            t = 0.0
-            arrivals = []
-            for r in by_id:
-                t += float(r.get("request_inter_arrival_delay") or 0)
-                arrivals.append(t)
-            completions = [arr + float(r["request_e2e_time"])
-                           for arr, r in zip(arrivals, by_id)]
-            sim_duration = max(completions) - min(arrivals) if arrivals else 0
-            total_decode_tok = sum(float(r.get("request_num_decode_tokens", 0)) for r in rows)
-            total_all_tok    = sum(float(r.get("request_num_tokens", 0)) for r in rows)
-            if sim_duration > 0:
-                print(f"  {'Throughput':42s}  "
-                      f"{len(rows)/sim_duration:.3f} req/s  |  "
-                      f"{total_decode_tok/sim_duration:.1f} decode tok/s  |  "
-                      f"{total_all_tok/sim_duration:.1f} total tok/s")
-        except Exception:
-            pass
-        print(f"  {'Requests completed':42s}  {len(rows)}")
-    except Exception as e:
-        print(f"  (request metrics not available: {e})")
+        sim.run()
+        sim._write_output()
+    finally:
+        sys.argv = saved_argv
 
-
-def _get_plane_stats(simulator):
-    """Extract HBF plane stats from the simulator."""
-    try:
-        from vidur.execution_time_predictor.hbf_execution_time_predictor import (
-            HBFLinearRegressionExecutionTimePredictor,
-        )
-        for rs in simulator._scheduler._replica_schedulers.values():
-            stage_sched = rs._replica_stage_schedulers.get(0)
-            if stage_sched and isinstance(
-                stage_sched._execution_time_predictor,
-                HBFLinearRegressionExecutionTimePredictor,
-            ):
-                return stage_sched._execution_time_predictor._hbf.plane_stats()
-    except Exception:
-        pass
-    return None
-
-
-def main() -> None:
-    p = argparse.ArgumentParser(description="HBF end-to-end simulation with sparsity")
-    p.add_argument("--model",            default="meta-llama/Llama-2-7b-hf")
-    p.add_argument("--device",           default="a100")
-    p.add_argument("--num_requests",     type=int,   default=32)
-    p.add_argument("--batch_size",       type=int,   default=8)
-    p.add_argument("--context_length",   type=int,   default=4096,
-                   help="Prefill (KV context) length in tokens")
-    p.add_argument("--decode_tokens",    type=int,   default=128)
-    p.add_argument("--qps",              type=float, default=1.0)
-    p.add_argument("--sparsity_fraction", type=float, default=0.1,
-                   help="Fraction of KV blocks to read per (seq, layer). "
-                        "1.0=dense, 0.1=10%% sparsity. Use 0 to run dense+sparse comparison.")
-    p.add_argument("--hbm_kv_fraction", type=float, default=0.0,
-                   help="Fraction of each sequence's most-recent KV blocks in HBM hot window. "
-                        "0 = all-flash baseline. 1/11 ≈ 0.0909 for 1:10 HBM:HBF split. "
-                        "When > 0: pipeline model where HBM dense attention and HBF sparse "
-                        "reads run concurrently; stall = max(hbm_time, flash_time).")
-    p.add_argument("--placement_policy", default="STRIPE",
-                   choices=["STRIPE", "PACK", "INTERLEAVE"])
-    p.add_argument("--decode_only", action="store_true",
-                   help="Start all requests with prefill already complete. "
-                        "Bypasses the prefill queue so the decode batch fills immediately. "
-                        "Use this to test steady-state decode throughput at large batch sizes.")
-    p.add_argument("--num_kv_blocks", type=int, default=0,
-                   help="Override KV cache block count (default: auto = batch × blocks_per_seq). "
-                        "Set >0 to bypass the GPU-memory-based limit. Required for "
-                        "decode_only runs with batch > ~300 on Llama-7B/A100.")
-    p.add_argument("--toml", default="configs/hbf_default.toml",
-                   help="Path to HBFSim TOML config")
-    p.add_argument("--compare", action="store_true",
-                   help="Run dense (1.0) and sparse (--sparsity_fraction) back-to-back for comparison")
-    args = p.parse_args()
-
-    toml_path = os.path.abspath(args.toml)
-    if not os.path.exists(toml_path):
-        print(f"ERROR: TOML config not found: {toml_path}")
-        sys.exit(1)
-
-    # Show hardware config
-    from vidur.memory_backends.hbf.config_loader import HBFSimConfigLoader
-    cfg = HBFSimConfigLoader(toml_path).load()
-    total_planes = (cfg.nand_stack.num_channels
-                    * cfg.nand_stack.num_dies_per_channel
-                    * cfg.nand_die.num_planes)
-    tR_ns    = cfg.subarray.tR_ns
-    peak_bw  = total_planes * cfg.subarray.page_size_bytes / tR_ns
-    cap_gb   = (total_planes * cfg.nand_die.blocks_per_plane
-                * cfg.subarray.pages_per_block * cfg.subarray.page_size_bytes) / 1e9
-    page_kb  = cfg.subarray.page_size_bytes / 1024
-
-    print(f"\n=== HBF Long-Context Sparsity Simulation ===")
-    print(f"Model:          {args.model}")
-    print(f"Context length: {args.context_length} tokens  (decode: +{args.decode_tokens})")
-    print(f"Batch cap:      {args.batch_size}  |  QPS: {args.qps}  |  Requests: {args.num_requests}")
-    print(f"Policy:         {args.placement_policy}")
-    if args.hbm_kv_fraction > 0:
-        hbf_frac = 1.0 - args.hbm_kv_fraction
-        ratio = round(hbf_frac / args.hbm_kv_fraction)
-        print(f"KV split:       HBM {args.hbm_kv_fraction:.1%} (hot) + HBF {hbf_frac:.1%} (cold)  "
-              f"[1:{ratio} HBM:HBF]  →  pipeline model")
-        print(f"HBF sparsity:   {args.sparsity_fraction:.0%} of cold KV blocks read (staged addresses)")
-    else:
-        print(f"Sparsity:       {args.sparsity_fraction:.0%} of KV blocks read per (seq, layer)  "
-              f"[all-flash baseline]")
-    print()
-    print(f"HBF hardware:")
-    print(f"  planes = {total_planes}  ({cfg.nand_stack.num_channels}ch x "
-          f"{cfg.nand_stack.num_dies_per_channel}dies x {cfg.nand_die.num_planes}pl/die)")
-    print(f"  page   = {page_kb:.0f} KB  |  tR = {tR_ns:.0f} ns  |  peak BW = {peak_bw:.0f} GB/s")
-    print(f"  cap    = {cap_gb:.1f} GB")
-
-    # Analytical KV data volume estimate
-    try:
-        from vidur.config import SimulationConfig  # noqa: F401
-        # quick block-size lookup: default sarathi block_size=16
-        block_size = 16
-        Nkv, D = 32, 128  # Llama-7B defaults (close enough for estimate)
-        kv_block_bytes = 2 * block_size * Nkv * D * 2
-        pages_per_kv_block = max(1, kv_block_bytes // cfg.subarray.page_size_bytes)
-        num_kv_blocks = max(1, -(-args.context_length // block_size))  # ceiling div
-        active_blocks = max(1, -(-int(num_kv_blocks * args.sparsity_fraction) // 1))
-        num_layers = 32  # Llama-7B
-
-        dense_data_gb = (args.batch_size * num_layers * num_kv_blocks
-                         * kv_block_bytes) / 1e9
-        sparse_data_gb = (args.batch_size * num_layers * active_blocks
-                          * kv_block_bytes) / 1e9
-
-        # Blocks per plane (STRIPE)
-        total_blocks_dense  = args.batch_size * num_layers * num_kv_blocks
-        total_blocks_sparse = args.batch_size * num_layers * active_blocks
-        bpp_dense  = -(-total_blocks_dense  // total_planes)  # ceiling
-        bpp_sparse = -(-total_blocks_sparse // total_planes)
-
-        dense_latency_ms  = bpp_dense  * pages_per_kv_block * tR_ns / 1e6
-        sparse_latency_ms = bpp_sparse * pages_per_kv_block * tR_ns / 1e6
-
-        hbm_bw_gbps = cfg.hbm.bandwidth_gbps  # GBps = bytes/ns
-
-        print()
-        print(f"Analytical estimate (batch={args.batch_size}, L={num_layers}, block_size={block_size}):")
-        print(f"  KV blocks per (seq, layer): {num_kv_blocks} dense  →  {active_blocks} sparse "
-              f"({args.sparsity_fraction:.0%})")
-        print(f"  Data per decode step:       {dense_data_gb*1000:.0f} MB dense  "
-              f"→  {sparse_data_gb*1000:.0f} MB sparse")
-        print(f"  Blocks per plane:           {bpp_dense} dense  →  {bpp_sparse} sparse")
-        print(f"  Flash stall (per step):     {dense_latency_ms:.1f} ms dense  "
-              f"→  {sparse_latency_ms:.1f} ms sparse  "
-              f"({dense_latency_ms/sparse_latency_ms:.1f}x speedup)")
-
-        if args.hbm_kv_fraction > 0:
-            # Pipeline model breakdown
-            hbm_kv_frac    = args.hbm_kv_fraction
-            hbm_blocks_seq = max(1, round(num_kv_blocks * hbm_kv_frac))
-            hbf_blocks_seq = max(0, num_kv_blocks - hbm_blocks_seq)
-
-            # HBM: read all seqs × all layers' hot window sequentially
-            hbm_kv_total  = args.batch_size * num_layers * hbm_blocks_seq * kv_block_bytes
-            hbm_time_ms   = hbm_kv_total / (hbm_bw_gbps * 1e6)
-
-            # HBF sparse: cold window only
-            total_hbf     = args.batch_size * num_layers * hbf_blocks_seq
-            bpp_hbf_dense = -(-total_hbf // total_planes)
-            bpp_hbf_sparse = max(1, -(-int(bpp_hbf_dense * args.sparsity_fraction) // 1))
-            flash_time_ms  = bpp_hbf_sparse * pages_per_kv_block * tR_ns / 1e6
-
-            effective_ms  = max(hbm_time_ms, flash_time_ms)
-            bound         = "HBM-bound ✓ flash free" if flash_time_ms <= hbm_time_ms else "flash-bound"
-
-            # Breakeven: largest sparsity where flash ≤ hbm_time
-            bpp_hbf_full  = bpp_hbf_dense * pages_per_kv_block  # pages/plane at 100%
-            breakeven     = hbm_time_ms / (bpp_hbf_full * tR_ns / 1e6) if bpp_hbf_full > 0 else 1.0
-
-            print()
-            print(f"  Pipeline model (HBM:HBF = 1:{round((1-hbm_kv_frac)/hbm_kv_frac)}):")
-            print(f"    HBM hot window:  {hbm_blocks_seq*block_size:6d} tokens  "
-                  f"({hbm_blocks_seq} blocks/seq)  "
-                  f"→  HBM read: {hbm_time_ms:.1f} ms  (all {num_layers}L × {args.batch_size}B @ {hbm_bw_gbps:.0f} GB/s)")
-            print(f"    HBF cold window: {hbf_blocks_seq*block_size:6d} tokens  "
-                  f"({hbf_blocks_seq} blocks/seq)  "
-                  f"→  flash:    {flash_time_ms:.1f} ms  ({args.sparsity_fraction:.0%} sparse, {bpp_hbf_sparse} pp)")
-            print(f"    Effective stall: {effective_ms:.1f} ms  [{bound}]")
-            print(f"    Breakeven sparsity (flash ≤ HBM): ≤ {breakeven:.1%}")
-            print(f"    vs dense all-flash:  {dense_latency_ms:.1f} ms  →  {effective_ms:.1f} ms  "
-                  f"({dense_latency_ms/effective_ms:.1f}× speedup)")
-    except Exception:
-        pass
-
-    if args.compare:
-        # Run dense and sparse scenarios as separate subprocesses to avoid
-        # global config state leaking between SimulationConfig instantiations.
-        import subprocess
-        base_cmd = [
-            sys.executable, __file__,
-            "--model",          args.model,
-            "--device",         args.device,
-            "--num_requests",   str(args.num_requests),
-            "--batch_size",     str(args.batch_size),
-            "--context_length", str(args.context_length),
-            "--decode_tokens",  str(args.decode_tokens),
-            "--qps",            str(args.qps),
-            "--placement_policy", args.placement_policy,
-            "--toml",           args.toml,
-        ]
-        dense_cmd  = base_cmd + ["--sparsity_fraction", "1.0"]
-        sparse_cmd = base_cmd + ["--sparsity_fraction", str(args.sparsity_fraction)]
-
-        print(f"\n{'='*60}")
-        print("Running: Dense (100%)")
-        print(f"{'='*60}")
-        subprocess.run(dense_cmd, check=False)
-
-        print(f"\n{'='*60}")
-        print(f"Running: Sparse ({args.sparsity_fraction:.0%})")
-        print(f"{'='*60}")
-        subprocess.run(sparse_cmd, check=False)
+    # Print metrics
+    req_csvs = glob.glob(f"{output_dir}/**/request_metrics.csv", recursive=True)
+    if not req_csvs:
+        print("ERROR: no request_metrics.csv", file=sys.stderr)
         return
 
-    # Single-scenario run
-    print(f"\n{'='*60}")
-    print(f"Running: Sparsity {args.sparsity_fraction:.0%}")
-    print(f"{'='*60}")
-    try:
-        simulator, output_dir = _run_simulation(args, toml_path, args.sparsity_fraction)
-        print(f"\n--- Request Metrics ---")
-        _print_request_metrics(output_dir)
+    with open(req_csvs[0]) as f:
+        rows = list(csvmod.DictReader(f))
 
-        ps = _get_plane_stats(simulator)
-        if ps:
-            # Total data transferred = pages read × page_size
-            total_data_gb = ps.cache_misses * cfg.subarray.page_size_bytes / 1e9
-            # Sustained BW = data / flash-active time (all planes busy → ≈ peak)
-            sustained_bw  = (total_data_gb * 1e9 / ps.current_time_ns
-                             if ps.current_time_ns > 0 else 0.0)
-            # Decode steps ≈ total plane ops / total_planes
-            decode_steps  = (ps.total_cmds_issued + ps.multi_plane_merge_count) // total_planes
-            print(f"\n--- HBF Plane Stats ---")
-            print(f"  planes active fraction = {ps.active_plane_fraction:.3f}  "
-                  f"(Gini={ps.gini_coefficient:.3f})")
-            print(f"  multi-plane merges     = {ps.multi_plane_merge_count:,}")
-            print(f"  mean cmd batch size    = {ps.mean_batch_size:.0f} planes")
-            print(f"  flash sim time         = {ps.current_time_ns/1e6:,.1f} ms")
-            print(f"  decode steps (est.)    = {decode_steps:,}")
-            print(f"  total data transferred = {total_data_gb:,.1f} GB")
-            print(f"  sustained flash BW     = {sustained_bw:.0f} GB/s  "
-                  f"(peak={peak_bw:.0f} GB/s)")
-        print(f"\n  Output: {output_dir}")
-    except Exception as e:
-        import traceback; traceback.print_exc()
-        print(f"  FAILED: {e}")
+    def pct(col, scale=1000):
+        vals = sorted(float(r[col]) for r in rows if r.get(col, ""))
+        if not vals:
+            return None, None
+        n = len(vals)
+        return vals[n // 2] * scale, vals[min(n-1, int(n*0.99))] * scale
+
+    ttft_p50, ttft_p99 = pct("prefill_e2e_time")
+    tpot_p50, tpot_p99 = pct("decode_time_execution_plus_preemption_normalized")
+
+    tput = None
+    try:
+        by_id = sorted(rows, key=lambda r: int(r["Request Id"]))
+        t = 0.0; arrivals = []
+        for r in by_id:
+            t += float(r.get("request_inter_arrival_delay") or 0)
+            arrivals.append(t)
+        comps = [a + float(r["request_e2e_time"]) for a, r in zip(arrivals, by_id)]
+        dur = max(comps) - min(arrivals)
+        dtoks = sum(float(r.get("request_num_decode_tokens", 0)) for r in rows)
+        tput = dtoks / dur if dur > 0 else None
+    except Exception:
+        pass
+
+    stall_ms = overlay.total_stall_seconds * 1e3
+
+    print(f"\n--- Request Metrics ---")
+    for lbl, v in [("TTFT p50 (ms)", ttft_p50), ("TTFT p99 (ms)", ttft_p99),
+                   ("TPOT p50 (ms)", tpot_p50), ("TPOT p99 (ms)", tpot_p99),
+                   ("Throughput (tok/s)", tput),
+                   ("HBF stall total (ms)", stall_ms)]:
+        print(f"  {lbl:30s} {f'{v:.2f}' if v is not None else 'N/A'}")
+    print(f"\n  Output: {output_dir}")
+    print(f"  Requests completed: {len(rows)}")
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def main():
+    p = argparse.ArgumentParser(description="HBF end-to-end simulation (HBFSim overlay)")
+    p.add_argument("--model",            default="meta-llama/Llama-2-7b-hf")
+    p.add_argument("--device",           default="a100")
+    p.add_argument("--num_requests",     type=int,   default=64)
+    p.add_argument("--batch_size",       type=int,   default=8)
+    p.add_argument("--context_length",   type=int,   default=4096)
+    p.add_argument("--decode_tokens",    type=int,   default=128)
+    p.add_argument("--qps",              type=float, default=1000.0)
+    p.add_argument("--decode_only",      action="store_true", default=False)
+    p.add_argument("--kv_read_fraction", type=float, default=1.0,
+                   help="Fraction of KV blocks to read per (request, layer). "
+                        "1.0=Dense, 0.1=Sparse TopK. NaiveSparse=1.0 (same as Dense).")
+    p.add_argument("--hbm_kv_fraction",  type=float, default=0.0,
+                   help="Fraction of KV blocks in HBM hot window. "
+                        "0 = all-flash. Computed by run_paper_sweep.py.")
+    p.add_argument("--num_kv_blocks",    type=int,   default=0,
+                   help="Override KV cache block count (0 = auto).")
+    p.add_argument("--tensor_parallel_size", type=int, default=1,
+                   help="Tensor parallel degree (1 = single GPU).")
+    p.add_argument("--max_drain_cycles", type=int, default=0,
+                   help="HBFSim drain budget in cycles (0 = auto-compute from flash time).")
+    p.add_argument("--hbfsim_toml",      default="configs/hbf_paper.toml",
+                   help="Path to HBFSim TOML config")
+    args = p.parse_args()
+
+    # Resolve to absolute path NOW before Vidur can chdir during init.
+    toml_path = os.path.abspath(args.hbfsim_toml)
+    if not os.path.exists(toml_path):
+        sys.exit(f"ERROR: HBFSim TOML not found: {toml_path}")
+    args.hbfsim_toml = toml_path
+
+    _run(args)
 
 
 if __name__ == "__main__":

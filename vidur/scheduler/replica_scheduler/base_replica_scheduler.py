@@ -41,10 +41,15 @@ class BaseReplicaScheduler(ABC):
             self._config.num_blocks = (
                 self._max_blocks_per_sequence * memory_planner.get_max_request_slots()
             )
-        self._max_batch_size = min(
-            memory_planner.get_max_batch_size(),
-            self._config.batch_size_cap,
-        )
+        # When num_blocks is explicitly provided (HBF: KV lives in flash, not GPU SRAM),
+        # skip the GPU-memory-based batch limit and use batch_size_cap directly.
+        if self._config.num_blocks:
+            self._max_batch_size = self._config.batch_size_cap
+        else:
+            self._max_batch_size = min(
+                memory_planner.get_max_batch_size(),
+                self._config.batch_size_cap,
+            )
 
         logger.debug(
             f"Obtained max batch size of {self._max_batch_size} for replica {self._replica_id}"

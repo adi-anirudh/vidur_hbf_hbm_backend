@@ -1,0 +1,35 @@
+% Max batch / throughput at TPOT-p50<= 50 ms, context=128K. '--' = no batch meets the SLO (OOM/latency-infeasible).
+\begin{tabular}{llrrrrr}
+\toprule
+Model & Dev & H3 b & H3 tok/s & SpaKV b & SpaKV tok/s & Speedup\\
+\midrule
+Phi-2 & a40 & -- & -- & 4 & 189 & --\\
+Phi-2 & a100 & 2 & 123 & 4 & 345 & 2.80$\times$\\
+Phi-2 & h100 & 2 & 124 & 4 & 350 & 2.82$\times$\\
+Phi-2 & h200 & 2 & 450 & 4 & 684 & 1.52$\times$\\
+Mistral-7B & a40 & 2 & 144 & 8 & 352 & 2.44$\times$\\
+Mistral-7B & a100 & 4 & 238 & 8 & 352 & 1.48$\times$\\
+Mistral-7B & h100 & 4 & 238 & 8 & 352 & 1.48$\times$\\
+Mistral-7B & h200 & 16 & 355 & 16 & 355 & 1.00$\times$\\
+Llama-3-8B & a40 & 2 & 146 & 8 & 355 & 2.43$\times$\\
+Llama-3-8B & a100 & 4 & 237 & 8 & 352 & 1.48$\times$\\
+Llama-3-8B & h100 & 4 & 240 & 8 & 355 & 1.48$\times$\\
+Llama-3-8B & h200 & 16 & 352 & 16 & 352 & 1.00$\times$\\
+Mixtral-8x7B & a40 & -- & -- & 8 & 352 & --\\
+Mixtral-8x7B & a100 & 2 & 144 & 8 & 352 & 2.44$\times$\\
+Mixtral-8x7B & h100 & 2 & 146 & 8 & 355 & 2.43$\times$\\
+Mixtral-8x7B & h200 & 2 & 146 & 8 & 355 & 2.44$\times$\\
+DeepSeek-67B & a40 & -- & -- & -- & -- & --\\
+DeepSeek-67B & a100 & -- & -- & -- & -- & --\\
+DeepSeek-67B & h100 & -- & -- & -- & -- & --\\
+DeepSeek-67B & h200 & -- & -- & -- & -- & --\\
+Llama-3-70B & a40 & -- & -- & -- & -- & --\\
+Llama-3-70B & a100 & -- & -- & -- & -- & --\\
+Llama-3-70B & h100 & -- & -- & -- & -- & --\\
+Llama-3-70B & h200 & -- & -- & -- & -- & --\\
+Qwen2-72B & a40 & -- & -- & -- & -- & --\\
+Qwen2-72B & a100 & -- & -- & -- & -- & --\\
+Qwen2-72B & h100 & -- & -- & -- & -- & --\\
+Qwen2-72B & h200 & -- & -- & -- & -- & --\\
+\bottomrule
+\end{tabular}

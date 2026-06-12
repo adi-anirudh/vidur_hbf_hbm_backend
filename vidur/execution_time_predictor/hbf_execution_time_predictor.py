@@ -342,9 +342,24 @@ class HBFLinearRegressionExecutionTimePredictor(LinearRegressionExecutionTimePre
 
         else:
             # ── Baseline: all KV in HBF ───────────────────────────────────────
-            total_dense_blocks      = total_kv_blocks_per_layer * num_layers
-            blocks_per_plane_dense  = math.ceil(total_dense_blocks / total_planes)
-            blocks_per_plane_sparse = max(1, math.ceil(blocks_per_plane_dense * sparsity))
+            total_dense_blocks     = total_kv_blocks_per_layer * num_layers
+            blocks_per_plane_dense = math.ceil(total_dense_blocks / total_planes)
+
+            if self._config.naive_sparse and sparsity < 1.0:
+                # Naive (random) sparsity: sparsity_fraction of blocks are useful but
+                # their positions are unknown, so we read sequentially until the last
+                # useful block is encountered.
+                # E[last useful block] = ceil((N-1) * k/(k+1)) + 1
+                # where k = number of useful blocks per plane = sparsity * N.
+                # For small sparsity this ≈ N (nearly dense), showing random sparsity
+                # provides almost no bandwidth saving without selective access.
+                n = blocks_per_plane_dense
+                k = max(1, sparsity * n)
+                blocks_per_plane_sparse = math.ceil((n - 1) * k / (k + 1)) + 1
+            else:
+                # Top-K selection (your model): reads exactly the k most relevant blocks.
+                blocks_per_plane_sparse = max(1, math.ceil(blocks_per_plane_dense * sparsity))
+
             pages_per_plane = max(1, math.ceil(blocks_per_plane_sparse * self._kv_block_bytes / page_size))
             plane_pages = {p: pages_per_plane for p in range(total_planes)}
             self._hbf.submit_plane_reads(plane_pages, token_id=0)

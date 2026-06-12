@@ -184,6 +184,9 @@ class FixedRequestLengthGeneratorConfig(BaseRequestLengthGeneratorConfig):
         metadata={"help": "Decode tokens for Fixed Request Length Generator."},
     )
 
+    def __post_init__(self):
+        self.max_tokens = self.prefill_tokens + self.decode_tokens
+
     @staticmethod
     def get_type():
         return RequestLengthGeneratorType.FIXED
@@ -637,6 +640,19 @@ class HBFLinearRegressionExecutionTimePredictorConfig(
                 "Fraction of KV blocks to read per (sequence, layer) at each decode step. "
                 "1.0 = dense attention (all blocks). 0.1 = 10%% sparsity (top-K' selection). "
                 "Models query-dependent sparsity where only the most relevant KV blocks are read."
+            )
+        },
+    )
+    naive_sparse: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "Model naive (random) sparsity: sparsity_fraction of blocks are marked useful "
+                "but their positions are unknown ahead of time, so blocks are read sequentially "
+                "until the last useful one is encountered. "
+                "Expected reads = ceil((N-1) * k/(k+1)) + 1 ≈ N for small sparsity, "
+                "showing that random sparsity provides almost no bandwidth saving vs dense. "
+                "Contrast with sparsity_fraction alone (top-K selection), which reads exactly k blocks."
             )
         },
     )

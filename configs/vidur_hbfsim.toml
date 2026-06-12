@@ -1,0 +1,88 @@
+# HBFSim config for Vidur paper sweep (HBF cold-KV simulation only).
+# Hardware: 1 stack, 8 SLC dies, 96 planes/die (768 planes total).
+# Peak read BW  = 768 planes x 4096 B / 4096 ns = 768 GB/s.
+# Capacity      = 768 planes x 256 blocks x 256 pages x 4096 B ≈ 206 GB.
+# NOTE: [hbm_media] is omitted intentionally — the overlay does not submit
+# HBM accesses to HBFSim; HBM bandwidth is modeled by Vidur's base predictor.
+
+[simulation]
+max_cycles              = 2_000_000_000
+warmup_cycles           = 0
+freq_mhz                = 1000
+output_csv_path         = "output/vidur_hbfsim.csv"
+output_stats_json_path  = "output/vidur_hbfsim_stats.json"
+log_level               = 0
+
+[host_bus]
+bandwidth_GBps          = 1000.0        # above HBF peak 768 GB/s; never the bottleneck
+base_latency_cycles     = 2
+queue_depth             = 65536
+cpu_compute_cycles      = 1
+
+[memory_model]
+address_space  = "composite"
+hbm_role       = "addressable"
+hbf_role       = "addressable"
+access_policy  = "address_partition"
+fabric         = "ideal_parallel"
+
+[address_mapping]
+policy                  = "block_interleave"
+num_stacks              = 1
+num_channels            = 1
+num_dies_hbf            = 8
+num_subarrays_hbf       = 96
+page_size_bytes         = 4096
+pages_per_block         = 256
+hbm_base_addr           = "0x0"
+hbm_size_bytes          = 64            # minimal; overlay never submits HBM accesses
+hbf_base_addr           = "0x1800000000"
+hbf_size_bytes          = "206000000000"    # 206e9 < physical 206158430208 B
+
+[hbf_controller]
+read_queue_depth              = 65536
+write_queue_depth             = 4096
+scheduler_type                = "frfcfs"
+controller_latency_cycles     = 2
+enable_read_priority          = true
+max_outstanding_per_subarray  = 64
+
+  [hbf_controller.ftl]
+  policy                 = "page_mapping"
+  write_allocator        = "round_robin"
+  unmapped_read_policy   = "prepopulate"
+
+  [hbf_controller.gc]
+  policy          = "greedy"
+
+  [hbf_controller.wear_leveler]
+  policy          = "round_robin"
+
+  [hbf_controller.thermal]
+  policy          = "null"
+
+[logic_die]
+num_channels                  = 1
+num_dies_per_stack            = 8
+num_subarrays_per_die         = 96
+tsv_bandwidth_GBps            = 1000    # above peak HBF BW; not the bottleneck
+logic_die_freq_mhz            = 1000
+command_translation_cycles    = 2
+max_concurrent_subarray_cmds  = 65536
+
+[nand_media]
+page_size_bytes           = 4096
+pages_per_block           = 256
+blocks_per_subarray       = 256
+num_dies_per_stack        = 8
+num_subarrays_per_die     = 96
+num_planes_per_die        = 96          # 1 plane per subarray; full multi-plane
+max_concurrent_per_plane  = 0           # auto (= subarrays/plane = 1)
+capacity_per_die_bytes    = 25769803776 # 96 x 256 x 256 x 4096 exactly
+tR_ns                     = 4096        # I/O-gated: 4096 B / (768 GB/s / 768) = 4096 ns
+tRC_ns                    = 30          # internal sense shortcut; not used for sequential
+tPROG_ns                  = 100000      # SLC page program ~100 us
+tBERS_ns                  = 1000000     # SLC block erase ~1 ms
+enable_multi_plane_cmds   = true
+max_plane_batch           = 96
+queue_depth               = 64
