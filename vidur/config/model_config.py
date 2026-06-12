@@ -223,7 +223,7 @@ class Mistral7BModelConfig(Llama2ModelConfig):
     mlp_hidden_dim: int = 14336
     max_position_embeddings: int = 32768
     rope_theta: Optional[float] = 10000
-    vocab_size: int = 128256   # set to match Meta-Llama-3-8B profiling source
+    vocab_size: int = 32000   # real HF config.json (was faked to 128256 to reuse Llama-3-8B traces)
 
     @staticmethod
     def get_name():
@@ -236,10 +236,12 @@ class Mixtral8x7BModelConfig(Llama2ModelConfig):
     num_q_heads: int = 32
     num_kv_heads: int = 8
     embedding_dim: int = 4096
-    mlp_hidden_dim: int = 14336   # single-expert hidden dim; uses Meta-Llama-3-8B profiling
+    mlp_hidden_dim: int = 14336   # per-expert intermediate size (HF). NOTE: MoE
+    # (8 experts, top-2). Vidur's reference GPTModel profiles a DENSE MLP, so
+    # this undercounts Mixtral's per-token MLP cost — handle before paper use.
     max_position_embeddings: int = 32768
     rope_theta: Optional[float] = 1000000
-    vocab_size: int = 128256   # set to match Meta-Llama-3-8B profiling source
+    vocab_size: int = 32000   # real HF config.json (was faked to 128256)
 
     @staticmethod
     def get_name():
@@ -252,10 +254,10 @@ class DeepSeek67BModelConfig(Llama2ModelConfig):
     num_q_heads: int = 64
     num_kv_heads: int = 8
     embedding_dim: int = 8192
-    mlp_hidden_dim: int = 28672   # approx (actual 22016); uses Llama-2-70b-hf profiling
+    mlp_hidden_dim: int = 22016   # real HF config.json (was faked to 28672 for Llama-2-70b reuse)
     max_position_embeddings: int = 4096
     rope_theta: Optional[float] = 10000
-    vocab_size: int = 32768   # set to match Llama-2-70b-hf profiling source
+    vocab_size: int = 102400   # real HF config.json (was faked to 32768)
 
     @staticmethod
     def get_name():
@@ -268,11 +270,11 @@ class Qwen2_72BModelConfig(QwenModelConfig):
     num_q_heads: int = 64
     num_kv_heads: int = 8
     embedding_dim: int = 8192
-    mlp_hidden_dim: int = 28672   # approx (actual ~29568); uses Llama-2-70b-hf profiling
+    mlp_hidden_dim: int = 29568   # real HF config.json (was faked to 28672 for Llama-2-70b reuse)
     max_position_embeddings: int = 131072
     rope_theta: Optional[float] = 1000000
-    vocab_size: int = 32768   # set to match Llama-2-70b-hf profiling source
-    use_qkv_bias: bool = False
+    vocab_size: int = 152064   # real HF config.json (was faked to 32768)
+    use_qkv_bias: bool = True   # Qwen2 uses QKV bias
 
     @staticmethod
     def get_name():

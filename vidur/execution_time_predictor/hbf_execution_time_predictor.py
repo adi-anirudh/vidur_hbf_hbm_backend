@@ -126,8 +126,14 @@ class HBFLinearRegressionExecutionTimePredictor(LinearRegressionExecutionTimePre
 
         # ── HBM timing / bandwidth ────────────────────────────────────────
         hbf_cfg = HBFSimConfigLoader(predictor_config.hbfsim_config_path).load()
-        # bandwidth_gbps is GBps (gigabytes/s); 1 GBps = 1 byte/ns
-        self._hbm_bandwidth_bpns = hbf_cfg.hbm.bandwidth_gbps
+        # HBM bandwidth must be DEVICE-SPECIFIC: long-context decode is memory
+        # bound, so weight loads / KV writes / HBM hot-window reads scale with
+        # the target GPU's HBM bandwidth — not a fixed config value. Using the
+        # TOML's single bandwidth makes A40 and H100 decode identical (the F6
+        # device-invariance bug). Prefer the device SKU; fall back to the TOML.
+        # bandwidth is GB/s; numerically 1 GB/s = 1 byte/ns.
+        device_bw = getattr(replica_config.device_config, "mem_bandwidth_gbps", None)
+        self._hbm_bandwidth_bpns = float(device_bw) if device_bw else hbf_cfg.hbm.bandwidth_gbps
 
         # ── Model geometry ────────────────────────────────────────────────
         E   = self._model_config.embedding_dim
@@ -287,14 +293,15 @@ class HBFLinearRegressionExecutionTimePredictor(LinearRegressionExecutionTimePre
           Returns: flash_stall_total / num_layers
 
         Pipeline (hbm_kv_fraction > 0):
-          Hot window (most-recent hbm_kv_fraction of blocks) → HBM.
-          Cold window (remaining blocks) → HBF, accessed with sparsity.
-          Flash reads for all layers are staged upfront while the GPU computes
-          HBM dense attention layer-by-layer.
+          Hot window (most-recent hbm_kv_fraction of blocks) stays in HBM; the
+          remaining cold KV has spilled to HBF and is read with sparsity. Within
+          a decode step the hot HBM read and the sparse HBF read happen serially
+          — the spilled fraction is fetched *in addition to* the hot window — so
+          the two times add rather than overlap.
             T_hbm  = num_layers × hbm_window_kv_bytes / hbm_bw  (serial, layer by layer)
             T_flash = plane scheduler latency for all layers' sparse HBF reads
-            Effective decode stall = max(T_hbm, T_flash)
-          Returns: max(T_hbm, T_flash) / num_layers
+            Effective decode time = T_hbm + T_flash
+          Returns: (T_hbm + T_flash) / num_layers
 
         Efficiency: instead of submitting O(B × L × K) events to the plane scheduler,
         compute the per-plane page load analytically (STRIPE mapping) and submit one
@@ -330,15 +337,20 @@ class HBFLinearRegressionExecutionTimePredictor(LinearRegressionExecutionTimePre
                 dense_pp  = math.ceil(total_hbf_blocks / total_planes)
                 sparse_pp = max(1, math.ceil(dense_pp * sparsity))
                 pages_per_plane = max(1, math.ceil(sparse_pp * self._kv_block_bytes / page_size))
-                plane_pages = {p: pages_per_plane for p in range(total_planes)}
-                self._hbf.submit_plane_reads(plane_pages, token_id=0)
+                plane_pages  = {p: pages_per_plane for p in range(total_planes)}
+                plane_blocks = {p: sparse_pp for p in range(total_planes)}
+                self._hbf.submit_plane_reads(
+                    plane_pages, token_id=0, plane_block_counts=plane_blocks)
                 completions = self._hbf.drain()
                 flash_time_ms = (max(c.latency_ns for c in completions) / 1e6
                                  if completions else 0.0)
             else:
                 flash_time_ms = 0.0
 
-            return max(hbm_time_ms, flash_time_ms) / num_layers
+            # HBM hot window and HBF cold window are read serially within the
+            # decode step: the spilled KV is fetched from HBF (sparse fraction)
+            # in addition to the hot KV from HBM, so the times add.
+            return (hbm_time_ms + flash_time_ms) / num_layers
 
         else:
             # ── Baseline: all KV in HBF ───────────────────────────────────────
@@ -357,12 +369,27 @@ class HBFLinearRegressionExecutionTimePredictor(LinearRegressionExecutionTimePre
                 k = max(1, sparsity * n)
                 blocks_per_plane_sparse = math.ceil((n - 1) * k / (k + 1)) + 1
             else:
-                # Top-K selection (your model): reads exactly the k most relevant blocks.
-                blocks_per_plane_sparse = max(1, math.ceil(blocks_per_plane_dense * sparsity))
+                # Top-K selection (your model): each sequence reads its k most
+                # relevant blocks per layer, k = ceil(seq_blocks * sparsity).
+                # Apply the selection per request *before* striping across planes
+                # so the per-plane count matches the physical access pattern (the
+                # trace-level sim); rounding sparsity after the divide-by-planes
+                # would drift by up to one block per plane.
+                total_selected_per_layer = sum(
+                    max(1, math.ceil(
+                        max(1, math.ceil(r.num_processed_tokens / self._block_size))
+                        * sparsity))
+                    for r in decode_reqs
+                )
+                total_selected_blocks = total_selected_per_layer * num_layers
+                blocks_per_plane_sparse = max(
+                    1, math.ceil(total_selected_blocks / total_planes))
 
             pages_per_plane = max(1, math.ceil(blocks_per_plane_sparse * self._kv_block_bytes / page_size))
-            plane_pages = {p: pages_per_plane for p in range(total_planes)}
-            self._hbf.submit_plane_reads(plane_pages, token_id=0)
+            plane_pages  = {p: pages_per_plane for p in range(total_planes)}
+            plane_blocks = {p: blocks_per_plane_sparse for p in range(total_planes)}
+            self._hbf.submit_plane_reads(
+                plane_pages, token_id=0, plane_block_counts=plane_blocks)
             completions = self._hbf.drain()
             if not completions:
                 return 0.0

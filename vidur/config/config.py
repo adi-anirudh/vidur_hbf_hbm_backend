@@ -663,9 +663,9 @@ class HBFLinearRegressionExecutionTimePredictorConfig(
                 "Fraction of each sequence's most-recent KV blocks stored in HBM (hot window). "
                 "The remaining (1 - hbm_kv_fraction) cold blocks are fetched from HBF. "
                 "0.0 = all KV in HBF (baseline). 0.0909 ≈ 1:10 HBM:HBF split. "
-                "When > 0, the predictor uses a pipeline model where HBM dense attention "
-                "and HBF sparse reads execute concurrently; effective decode stall = "
-                "max(hbm_dense_attention_time, hbf_sparse_read_time)."
+                "When > 0, the hot window is read from HBM and the spilled cold KV is "
+                "read from HBF (sparse fraction) in addition to it, so the reads are "
+                "serial; effective decode time = hbm_dense_attention_time + hbf_sparse_read_time."
             )
         },
     )

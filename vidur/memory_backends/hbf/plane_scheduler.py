@@ -46,6 +46,12 @@ class NANDRequest:
     addr:      PhysicalAddr
     size_bytes: int
     issued_at: float  # simulation time (ns) when submit() was called
+    # Number of DISTINCT NAND blocks this request's pages span. 0 = legacy
+    # contiguous behaviour (pages laid out sequentially from addr.block_id).
+    # >0 marks an aggregate per-plane read covering `num_blocks` independent KV
+    # blocks, each of which incurs its own tR page-buffer miss — used to make
+    # the analytical per-plane read match the per-KV-block trace-level sim.
+    num_blocks: int = 0
 
 
 @dataclass
@@ -357,6 +363,25 @@ class PlaneScheduler:
         pages_per_block = self._sa.pages_per_block
 
         if req.op in (OpType.READ, OpType.PREFETCH):
+            # ── Aggregate read spanning N distinct NAND blocks ───────────────
+            # Each KV block lives in its own NAND block, so each incurs a tR
+            # page-buffer miss; only the pages within a block hit (tRC). This
+            # makes one aggregate per-plane read produce the same latency as the
+            # equivalent N per-KV-block reads of the trace-level sim.
+            if req.num_blocks > 0:
+                nb           = req.num_blocks
+                pages_per_kv = max(1, num_pages // nb)
+                misses_per_kv = max(1, math.ceil(pages_per_kv / pages_per_block))
+                num_misses   = min(num_pages, nb * misses_per_kv)
+                num_hits     = num_pages - num_misses
+                total_ns     = num_hits * self._sa.tRC_ns + num_misses * self._sa.tR_ns
+                # Distinct physical blocks: leave the page buffer cold so a
+                # subsequent step does not score a spurious cache hit.
+                sa.current_block = -1
+                self._cache_hits   += num_hits
+                self._cache_misses += num_misses
+                return total_ns
+
             # ── Fast path: sequential read from block_id, page 0 ─────────────
             # submit_plane_reads always issues requests with block_id=0, page_id=0
             # (token_id=0 → row_offset=0).  For this fully sequential pattern the

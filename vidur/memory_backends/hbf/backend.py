@@ -220,11 +220,23 @@ class HBFSimBackend(MemoryBackend):
                 req_ids.append(rid)
         return req_ids
 
-    def submit_plane_reads(self, plane_page_counts: dict, token_id: int = 0) -> None:
+    def submit_plane_reads(
+        self,
+        plane_page_counts: dict,
+        token_id: int = 0,
+        plane_block_counts: Optional[dict] = None,
+    ) -> None:
         """
         Submit one aggregate read request per plane.
 
-        plane_page_counts: {plane_id: num_pages} — pre-computed per-plane load.
+        plane_page_counts:  {plane_id: num_pages} — pre-computed per-plane load.
+        plane_block_counts: {plane_id: num_kv_blocks} — number of DISTINCT KV
+            blocks making up that plane's pages. Each KV block sits in its own
+            NAND block and pays its own tR (page-buffer miss); pages within a
+            block pay tRC. When omitted (None), the legacy contiguous model is
+            used (a single tR plus tRC for the rest), which under-counts the
+            real per-KV-block trace because it assumes the pages are physically
+            contiguous. Pass this to match the trace-level sim.
         token_id controls row_offset for multi-plane command merging.
         All planes with the same token_id and row_offset merge into one command.
 
@@ -258,6 +270,8 @@ class HBFSimBackend(MemoryBackend):
                 addr=addr,
                 size_bytes=num_pages * page_bytes,
                 issued_at=self._current_time_ns,
+                num_blocks=(plane_block_counts.get(plane_id, 0)
+                            if plane_block_counts else 0),
             )
             self._scheduler.submit(nand_req)
 
