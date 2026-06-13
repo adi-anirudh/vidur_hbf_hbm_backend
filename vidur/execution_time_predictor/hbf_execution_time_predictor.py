@@ -140,7 +140,7 @@ class HBFLinearRegressionExecutionTimePredictor(LinearRegressionExecutionTimePre
         H   = self._model_config.mlp_hidden_dim
         Nq  = self._model_config.num_q_heads
         Nkv = self._model_config.num_kv_heads
-        D   = E // Nq  # head_dim
+        D   = self._model_config.head_size()  # explicit head_dim if set, else E//Nq
 
         # ── Tensor parallelism ────────────────────────────────────────────
         # TP shards weight matrices (column/row-parallel) and KV heads across

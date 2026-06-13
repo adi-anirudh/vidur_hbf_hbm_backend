@@ -65,6 +65,11 @@ def build_argv(args, output_dir):
         "--synthetic_request_generator_config_decode_only",
         # Metrics
         "--metrics_config_output_dir",  output_dir,
+        # Per-process cache dir: the sklearn predictor caches trained models to
+        # disk keyed by a hash; parallel sweep workers writing a SHARED cache
+        # race and truncate each other's files (empty-pickle EOFError). A unique
+        # cache dir per process is collision-free.
+        "--metrics_config_cache_dir",   args.cache_dir,
         "--no-metrics_config_write_json_trace",
         "--no-metrics_config_store_plots",
         "--no-metrics_config_enable_chrome_trace",
@@ -87,8 +92,14 @@ def main():
     p.add_argument("--hbm_kv_fraction", type=float, default=0.0)
     p.add_argument("--num_kv_blocks", type=int, default=0)
     p.add_argument("--hbfsim_toml", default="configs/hbf_paper.toml")
+    p.add_argument("--cache_dir", default="",
+                   help="Predictor cache dir (default: a unique temp dir, "
+                        "collision-free for parallel sweeps).")
     args = p.parse_args()
     args.hbfsim_toml = os.path.abspath(args.hbfsim_toml)
+    _own_cache = not args.cache_dir
+    if _own_cache:
+        args.cache_dir = tempfile.mkdtemp(prefix="hbf_cache_")
 
     output_dir = tempfile.mkdtemp(prefix="hbf_pt_")
     saved = sys.argv[:]
@@ -122,6 +133,12 @@ def main():
     tp50, tp99 = pct("decode_time_execution_plus_preemption_normalized")
     print(f"RESULT status=OK tpot_p50_ms={tp50} tpot_p99_ms={tp99} "
           f"n_requests={len(rows)}")
+
+    # tidy temp dirs so a large sweep doesn't fill /tmp
+    import shutil
+    shutil.rmtree(output_dir, ignore_errors=True)
+    if _own_cache:
+        shutil.rmtree(args.cache_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":

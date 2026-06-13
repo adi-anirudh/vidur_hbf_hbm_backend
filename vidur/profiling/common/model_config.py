@@ -30,7 +30,9 @@ class ModelConfig:
         rope_scaling: Optional[Dict[str, Any]] = None,
         partial_rotary_factor: float = 1.0,
         no_tensor_parallel: bool = False,
+        head_dim: Optional[int] = None,
     ):
+        self.head_dim = head_dim
         self.name = name
         self.num_layers = num_layers
         self.num_q_heads = num_q_heads
@@ -73,7 +75,7 @@ class ModelConfig:
         return self.num_kv_heads // parallel_config.tensor_parallel_size
 
     def get_head_size(self):
-        return self.embedding_dim // self.num_q_heads
+        return self.head_dim if self.head_dim else self.embedding_dim // self.num_q_heads
 
     @property
     def dtype(self):

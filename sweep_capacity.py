@@ -32,6 +32,12 @@ PARAMS = {
     "meta-llama/Meta-Llama-3-70B":        70.6e9,
     "Qwen/Qwen-72B":                      72.3e9,
     "Qwen/Qwen2-72B":                     72.7e9,
+    # frontier / MoE additions (total stored params, fp16)
+    "meta-llama/Meta-Llama-3.1-405B":          405.0e9,
+    "meta-llama/Llama-3.3-70B-Instruct":       70.6e9,
+    "mistralai/Mixtral-8x22B-v0.1":            141.0e9,
+    "Qwen/Qwen3-235B-A22B":                    235.0e9,
+    "Qwen/Qwen3-Coder-480B-A35B-Instruct":     480.0e9,
 }
 
 TP_CANDIDATES = [1, 2, 4, 8]
@@ -40,7 +46,7 @@ BYTES_FP16 = 2
 
 def _dims(model: str):
     c = BaseModelConfig.create_from_name(model)
-    head_dim = c.embedding_dim // c.num_q_heads
+    head_dim = c.head_size()  # explicit head_dim if set (Qwen3), else emb//q
     return c.num_layers, c.num_kv_heads, head_dim
 
 

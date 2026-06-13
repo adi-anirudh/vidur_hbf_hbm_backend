@@ -25,7 +25,7 @@ class CausalSelfAttention(torch.nn.Module):
         assert config.num_q_heads % world_size == 0
         assert config.num_kv_heads % world_size == 0
 
-        self.head_dim = config.embedding_dim // config.num_q_heads
+        self.head_dim = config.get_head_size()
         self.num_q_heads_per_worker = config.num_q_heads // world_size
         self.num_kv_heads_per_worker = config.num_kv_heads // world_size
 

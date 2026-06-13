@@ -28,6 +28,14 @@ class BaseModelConfig(BaseFixedConfig):
     rope_scaling: Optional[Dict[str, Any]] = None
     partial_rotary_factor: float = 1.0
     no_tensor_parallel: bool = False
+    # Explicit attention head dim. None -> embedding_dim // num_q_heads (default).
+    # Qwen3 sets head_dim independently of hidden size (hidden=4096, q=64,
+    # head_dim=128 -> q_proj 4096->8192); set it so KV size + weight bytes are
+    # correct. Read via head_size().
+    head_dim: Optional[int] = None
+
+    def head_size(self) -> int:
+        return self.head_dim if self.head_dim else self.embedding_dim // self.num_q_heads
 
 
 @dataclass
@@ -295,3 +303,77 @@ class Llama31_405BModelConfig(Llama2ModelConfig):
     @staticmethod
     def get_name():
         return "meta-llama/Meta-Llama-3.1-405B"
+
+
+@dataclass
+class Llama33_70BModelConfig(Llama2ModelConfig):
+    # Llama-3.3-70B: identical architecture to Llama-3-70B (dense GQA).
+    num_layers: int = 80
+    num_q_heads: int = 64
+    num_kv_heads: int = 8
+    embedding_dim: int = 8192
+    mlp_hidden_dim: int = 28672
+    max_position_embeddings: int = 131072
+    rope_theta: Optional[float] = 500000
+    vocab_size: int = 128256
+
+    @staticmethod
+    def get_name():
+        return "meta-llama/Llama-3.3-70B-Instruct"
+
+
+@dataclass
+class Mixtral8x22BModelConfig(Llama2ModelConfig):
+    # MoE (8 experts, 2/tok). Standard head_dim (6144/48=128). mlp_hidden_dim =
+    # active experts x intermediate (2 x 16384) — per-token active MLP. Vidur
+    # profiles this as a DENSE MLP (no routing): MoE-compute caveat.
+    num_layers: int = 56
+    num_q_heads: int = 48
+    num_kv_heads: int = 8
+    embedding_dim: int = 6144
+    mlp_hidden_dim: int = 32768
+    max_position_embeddings: int = 65536
+    rope_theta: Optional[float] = 1000000
+    vocab_size: int = 32000
+
+    @staticmethod
+    def get_name():
+        return "mistralai/Mixtral-8x22B-v0.1"
+
+
+@dataclass
+class Qwen3_235B_A22BModelConfig(Llama2ModelConfig):
+    # MoE (128 experts, 8/tok), GQA 64q/4kv, EXPLICIT head_dim=128 (!= 4096/64).
+    # mlp_hidden_dim = active experts x moe_intermediate (8 x 1536). MoE caveat.
+    num_layers: int = 94
+    num_q_heads: int = 64
+    num_kv_heads: int = 4
+    embedding_dim: int = 4096
+    head_dim: Optional[int] = 128
+    mlp_hidden_dim: int = 12288
+    max_position_embeddings: int = 40960
+    rope_theta: Optional[float] = 10000000
+    vocab_size: int = 151936
+
+    @staticmethod
+    def get_name():
+        return "Qwen/Qwen3-235B-A22B"
+
+
+@dataclass
+class Qwen3_Coder_480BModelConfig(Llama2ModelConfig):
+    # MoE (160 experts, 8/tok), GQA 96q/8kv, EXPLICIT head_dim=128 (!= 6144/96).
+    # mlp_hidden_dim = active experts x moe_intermediate (8 x 2560). MoE caveat.
+    num_layers: int = 62
+    num_q_heads: int = 96
+    num_kv_heads: int = 8
+    embedding_dim: int = 6144
+    head_dim: Optional[int] = 128
+    mlp_hidden_dim: int = 20480
+    max_position_embeddings: int = 262144
+    rope_theta: Optional[float] = 10000000
+    vocab_size: int = 151936
+
+    @staticmethod
+    def get_name():
+        return "Qwen/Qwen3-Coder-480B-A35B-Instruct"
