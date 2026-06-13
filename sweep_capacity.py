@@ -18,7 +18,7 @@ from __future__ import annotations
 from vidur.config.model_config import BaseModelConfig
 
 # Per-GPU HBM (GB), from device_sku_config.py
-HBM_GB = {"a40": 45, "a100": 80, "h100": 80, "h200": 141}
+HBM_GB = {"a40": 45, "a100": 80, "h100": 80, "h200": 141, "blackwell": 96}
 # Per-GPU HBF stack (GB): 768 planes x 256 blocks x 256 pages x 4096 B  (hbf_paper.toml)
 HBF_GB = 768 * 256 * 256 * 4096 / 1e9   # ~206.16
 

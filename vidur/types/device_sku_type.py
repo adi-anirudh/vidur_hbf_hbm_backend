@@ -6,3 +6,4 @@ class DeviceSKUType(BaseIntEnum):
     A100 = 2
     H100 = 3
     H200 = 4
+    BLACKWELL = 5

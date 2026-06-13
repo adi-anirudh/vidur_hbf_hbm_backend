@@ -142,21 +142,32 @@ class HBFLinearRegressionExecutionTimePredictor(LinearRegressionExecutionTimePre
         Nkv = self._model_config.num_kv_heads
         D   = E // Nq  # head_dim
 
-        # ── Weight sizes per layer (FP16 = 2 bytes) ───────────────────────
-        # QKV: Q (E×NqD) + K (E×NkvD) + V (E×NkvD)
-        self._qkv_weight_bytes = (E * Nq * D + 2 * E * Nkv * D) * 2
-        # O projection: NqD × E
-        self._o_weight_bytes = Nq * D * E * 2
+        # ── Tensor parallelism ────────────────────────────────────────────
+        # TP shards weight matrices (column/row-parallel) and KV heads across
+        # workers: each GPU holds and moves 1/TP of the weights and KV. Decode
+        # runs on all workers in parallel, so the step time is this per-worker
+        # time. Every memory-traffic term below is therefore divided by TP.
+        # (Without this the predictor used full-model bytes -> TP>1 overestimated
+        # weight-load / KV-read / KV-write by ~TP×.)
+        TP = max(1, self._replica_config.tensor_parallel_size)
+
+        # ── Weight sizes per layer, per worker (FP16 = 2 bytes) ───────────
+        # QKV: Q (E×NqD) + K (E×NkvD) + V (E×NkvD), column-parallel → /TP
+        self._qkv_weight_bytes = (E * Nq * D + 2 * E * Nkv * D) * 2 // TP
+        # O projection: NqD × E, row-parallel → /TP
+        self._o_weight_bytes = (Nq * D * E * 2) // TP
         # MLP gate fused with up in gated architectures (LLaMA SwiGLU)
         _gate = 2 if self._model_config.use_gated_mlp else 1
-        self._mlp_up_weight_bytes   = E * H * _gate * 2
-        self._mlp_down_weight_bytes = H * E * 2
+        self._mlp_up_weight_bytes   = (E * H * _gate * 2) // TP   # column-parallel
+        self._mlp_down_weight_bytes = (H * E * 2) // TP           # row-parallel
 
-        # ── KV sizes ──────────────────────────────────────────────────────
-        # Full KV block: K+V, block_size tokens, FP16
-        self._kv_block_bytes = 2 * self._block_size * Nkv * D * 2
-        # One new token write per decode step: K+V, 1 token, FP16
-        self._kv_write_bytes = 2 * Nkv * D * 2
+        # ── KV sizes, per worker (KV heads sharded across TP) ─────────────
+        # Per-worker KV block: K+V, block_size tokens, Nkv/TP heads, FP16.
+        # NB: the block COUNT is TP-independent (same token positions); TP only
+        # shrinks bytes-per-block, so flash KV read stays largely tR-bound.
+        self._kv_block_bytes = (2 * self._block_size * Nkv * D * 2) // TP
+        # One new token write per decode step: K+V, 1 token, Nkv/TP heads, FP16
+        self._kv_write_bytes = (2 * Nkv * D * 2) // TP
 
         # ── Weight address layout (layer-major) in HBM ───────────────────
         # [layer0: QKV | O | up | down] [layer1: ...] ...

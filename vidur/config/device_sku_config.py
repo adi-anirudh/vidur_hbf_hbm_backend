@@ -59,3 +59,17 @@ class H200DeviceSKUConfig(BaseDeviceSKUConfig):
     @staticmethod
     def get_type():
         return DeviceSKUType.H200
+
+
+@dataclass
+class BlackwellDeviceSKUConfig(BaseDeviceSKUConfig):
+    # NVIDIA RTX PRO 6000 Blackwell Server Edition: 96GB GDDR7, 1.6 TB/s.
+    # fp16_tflops approximate (not used by the memory-bound decode path; compute
+    # comes from profiled traces). Refine if compute-bound regimes matter.
+    fp16_tflops: int = 500
+    total_memory_gb: int = 96
+    mem_bandwidth_gbps: float = 1600.0
+
+    @staticmethod
+    def get_type():
+        return DeviceSKUType.BLACKWELL
