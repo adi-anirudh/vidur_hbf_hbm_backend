@@ -98,6 +98,11 @@ class HBFSimConfig:
     nand_die:    NANDDieConfig   = field(default_factory=NANDDieConfig)
     nand_stack:  NANDStackConfig = field(default_factory=NANDStackConfig)
     hbm:         HBMConfig       = field(default_factory=HBMConfig)
+    # Shared HBF read-return / TSV bus bandwidth (GB/s = bytes/ns). Caps achieved
+    # flash BW: even with all planes sensing in parallel, data streams out over
+    # this bus. Without it the plane model overshoots aggregate BW at high
+    # plane-parallelism (found in HBFSim validation). 0 = uncapped (back-compat).
+    bus_bandwidth_gbps: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -265,9 +270,16 @@ class HBFSimConfigLoader:
             freq_mhz=hbm_freq,
         )
 
+        # Shared read-return bus ceiling: host_bus.bandwidth_GBps, else
+        # logic_die.tsv_bandwidth_GBps, else 0 (uncapped).
+        host_bus = s.get("host_bus", {})
+        bus_bw = _float(host_bus, "bandwidth_GBps",
+                        default=_float(ld, "tsv_bandwidth_GBps", default=0.0))
+
         return HBFSimConfig(
             subarray=subarray,
             nand_die=nand_die,
             nand_stack=nand_stack,
             hbm=hbm_cfg,
+            bus_bandwidth_gbps=bus_bw,
         )

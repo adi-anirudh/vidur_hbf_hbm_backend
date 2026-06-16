@@ -65,7 +65,13 @@ def select_tp(model: str, device: str, batch: int, ctx: int):
     _, n_kv, _ = _dims(model)
     total = weight_bytes(model) + kv_bytes(model, batch, ctx)
     cap_bytes = (HBM_GB[device] + HBF_GB) * 1e9
-    tp_cap = min(8, n_kv)
+    # Models flagged no_tensor_parallel (e.g. phi-2) can't shard -> TP=1 only;
+    # if they don't fit at TP=1 they're INFEASIBLE (not a higher TP). Otherwise
+    # cap TP at the KV-head count (can't shard KV beyond num_kv_heads).
+    if getattr(BaseModelConfig.create_from_name(model), "no_tensor_parallel", False):
+        tp_cap = 1
+    else:
+        tp_cap = min(8, n_kv)
     for tp in TP_CANDIDATES:
         if tp > tp_cap:
             break

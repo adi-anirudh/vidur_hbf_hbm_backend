@@ -37,7 +37,7 @@ from vidur.memory_backends.hbf.address_mapper import PhysicalAddr
 from vidur.memory_backends.base import OpType
 from vidur.memory_backends.hbf.config_loader import NANDDieConfig, NANDStackConfig, SubarrayConfig
 
-HBFSIM_BIN  = "/home/adityaan/HBFSim/build-dramsim3/hbfsim"
+HBFSIM_BIN  = "/home/adityaan/HBFSim/build/hbfsim"
 HBFSIM_ROOT = "/home/adityaan/HBFSim"
 
 # ---------------------------------------------------------------------------

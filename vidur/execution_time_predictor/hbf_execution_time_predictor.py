@@ -293,6 +293,77 @@ class HBFLinearRegressionExecutionTimePredictor(LinearRegressionExecutionTimePre
     # Override: decode KV read → HBF plane scheduler (+ HBM for hot tier)
     # ──────────────────────────────────────────────────────────────────────
 
+    def _bus_capped_ms(self, flash_ms: float, total_bytes: float) -> float:
+        """Cap a per-plane-parallel flash time by the shared read-return bus: even
+        with all planes sensing in parallel the data streams out over one bus, so
+        achieved time can't beat total_bytes / bus_bandwidth. Validated vs HBFSim
+        (our plane model alone overshoots aggregate BW at high plane-parallelism).
+        bus=0 -> uncapped."""
+        bus_bpns = self._hbf.bus_bandwidth_bpns()
+        if bus_bpns <= 0:
+            return flash_ms
+        return max(flash_ms, (total_bytes / bus_bpns) / 1e6)
+
+    def _hbf_sra_score_ms(self, total_cold_blocks_all_layers: int) -> float:
+        """HBF-SRA in-flash scoring time (ms). A near-memory processor (NMP) inside
+        the HBF reads ALL cold K and scores it (actual KV, not metadata) to pick the
+        sparse set. Scoring is the attention dot product q.k, computed PER QUERY HEAD
+        against K, so:
+            score_FLOPs = 2 x head_dim x n_q_heads x num_keys
+        Intensity = score_FLOPs / K_bytes = n_q_heads / n_kv_heads (the GQA ratio)
+        FLOP/byte. So scoring is compute-bound exactly when GQA_ratio > nmp_flops/byte
+        (true for all GQA models here: ratio 4-8 vs nmp=2); MHA (ratio 1) is read-
+        bound. We take the honest max of the two rather than assuming either:
+            T_score = max(read_all_K, score_FLOPs / (nmp_flops_per_byte x flash_BW))
+
+        The NMP reads K at the PLANE-AGGREGATE bandwidth (peak_bandwidth_gbps): it
+        is near-memory, so the K read never crosses the shared host return bus — only
+        the sparse selected KV does (that read is bus-capped, separately). This is the
+        architectural advantage SRA buys over reading all K to the GPU."""
+        tp = max(1, self._replica_config.tensor_parallel_size)
+        nq_worker = max(1, self._model_config.num_q_heads // tp)
+        head_dim = self._model_config.head_size()
+        total_keys = total_cold_blocks_all_layers * self._block_size
+        score_flops = 2 * head_dim * nq_worker * total_keys
+        flash_bw_bpns = self._hbf.peak_bandwidth_gbps()   # bytes/ns (internal plane BW)
+        t_compute_ms = (score_flops / (self._config.nmp_flops_per_byte * flash_bw_bpns)) / 1e6
+        # read all cold K from flash (K is half of a KV block; kv_block_bytes is
+        # already per-worker / TP)
+        k_bytes = total_cold_blocks_all_layers * (self._kv_block_bytes / 2)
+        t_read_ms = (k_bytes / flash_bw_bpns) / 1e6
+        return max(t_read_ms, t_compute_ms)
+
+    def _plane_sparse_read_ms(self, blocks_per_plane: int, block_bytes: float,
+                              extra_bus_bytes: float = 0.0) -> float:
+        """Bus-capped flash read of `blocks_per_plane` blocks on every plane, each
+        `block_bytes` wide.
+          Dense/Sparse: block_bytes = full KV block (GPU reads K+V, does both GEMVs).
+          HBF-SRA:      block_bytes = KV/2 (V only) — the NMP already did the QK^T
+                        scoring near-memory, so the GPU only reads V for the AV GEMV
+                        and receives the scores A from the NMP. A traverses the same
+                        return bus but is not sensed from the planes, so it is added
+                        to the bus byte budget (extra_bus_bytes), not the plane read.
+        """
+        page_size    = self._hbf._cfg.subarray.page_size_bytes
+        total_planes = self._hbf._mapper.total_planes
+        pages_per_plane = max(1, math.ceil(blocks_per_plane * block_bytes / page_size))
+        plane_pages  = {p: pages_per_plane for p in range(total_planes)}
+        plane_blocks = {p: blocks_per_plane for p in range(total_planes)}
+        self._hbf.submit_plane_reads(
+            plane_pages, token_id=0, plane_block_counts=plane_blocks)
+        completions = self._hbf.drain()
+        ms = (max(c.latency_ns for c in completions) / 1e6) if completions else 0.0
+        bus_bytes = total_planes * pages_per_plane * page_size + extra_bus_bytes
+        return self._bus_capped_ms(ms, bus_bytes)
+
+    def _hbf_sra_scores_bytes(self, total_selected_blocks_all_layers: int) -> float:
+        """Bytes of attention scores A the NMP returns to the GPU: one scalar per
+        (query head, selected KV token), fp16. Tiny vs V but it shares the bus."""
+        tp = max(1, self._replica_config.tensor_parallel_size)
+        nq_worker = max(1, self._model_config.num_q_heads // tp)
+        selected_tokens = total_selected_blocks_all_layers * self._block_size
+        return nq_worker * selected_tokens * 2.0
+
     def _get_attention_decode_execution_time(self, batch: Batch) -> float:
         """
         Replace sklearn attn_decode model with cycle-accurate NAND plane simulation.
@@ -342,21 +413,30 @@ class HBFLinearRegressionExecutionTimePredictor(LinearRegressionExecutionTimePre
             hbm_kv_bytes = hbm_blocks * num_layers * self._kv_block_bytes
             hbm_time_ms  = hbm_kv_bytes / (self._hbm_bandwidth_bpns * 1e6)
 
-            # HBF time: sparse on cold portion, all layers staged simultaneously
+            sra = getattr(self._config, "hbf_sra", False)
+            # HBF time: sparse on cold portion, all layers staged simultaneously.
+            # SRA reads V only (KV/2) since the NMP did QK^T near-memory; non-SRA
+            # reads the full KV block.
             if hbf_blocks > 0 and sparsity > 0:
                 total_hbf_blocks = hbf_blocks * num_layers
                 dense_pp  = math.ceil(total_hbf_blocks / total_planes)
                 sparse_pp = max(1, math.ceil(dense_pp * sparsity))
-                pages_per_plane = max(1, math.ceil(sparse_pp * self._kv_block_bytes / page_size))
-                plane_pages  = {p: pages_per_plane for p in range(total_planes)}
-                plane_blocks = {p: sparse_pp for p in range(total_planes)}
-                self._hbf.submit_plane_reads(
-                    plane_pages, token_id=0, plane_block_counts=plane_blocks)
-                completions = self._hbf.drain()
-                flash_time_ms = (max(c.latency_ns for c in completions) / 1e6
-                                 if completions else 0.0)
+                if sra:
+                    a_bytes = self._hbf_sra_scores_bytes(sparse_pp * total_planes)
+                    flash_time_ms = self._plane_sparse_read_ms(
+                        sparse_pp, self._kv_block_bytes / 2.0, extra_bus_bytes=a_bytes)
+                else:
+                    flash_time_ms = self._plane_sparse_read_ms(
+                        sparse_pp, self._kv_block_bytes)
             else:
                 flash_time_ms = 0.0
+
+            if sra:
+                # HBF-SRA: NMP scores ALL cold K in-flash while the GPU reads the
+                # hot HBM window (overlap), THEN the GPU reads sparse V + scores A:
+                #   T = max(T_hbm, T_score) + T_send(A + sparse_V)
+                t_score_ms = self._hbf_sra_score_ms(max(0, hbf_blocks) * num_layers)
+                return (max(hbm_time_ms, t_score_ms) + flash_time_ms) / num_layers
 
             # HBM hot window and HBF cold window are read serially within the
             # decode step: the spilled KV is fetched from HBF (sparse fraction)
@@ -379,6 +459,7 @@ class HBFLinearRegressionExecutionTimePredictor(LinearRegressionExecutionTimePre
                 n = blocks_per_plane_dense
                 k = max(1, sparsity * n)
                 blocks_per_plane_sparse = math.ceil((n - 1) * k / (k + 1)) + 1
+                total_selected_blocks = blocks_per_plane_sparse * total_planes
             else:
                 # Top-K selection (your model): each sequence reads its k most
                 # relevant blocks per layer, k = ceil(seq_blocks * sparsity).
@@ -396,15 +477,23 @@ class HBFLinearRegressionExecutionTimePredictor(LinearRegressionExecutionTimePre
                 blocks_per_plane_sparse = max(
                     1, math.ceil(total_selected_blocks / total_planes))
 
-            pages_per_plane = max(1, math.ceil(blocks_per_plane_sparse * self._kv_block_bytes / page_size))
-            plane_pages  = {p: pages_per_plane for p in range(total_planes)}
-            plane_blocks = {p: blocks_per_plane_sparse for p in range(total_planes)}
-            self._hbf.submit_plane_reads(
-                plane_pages, token_id=0, plane_block_counts=plane_blocks)
-            completions = self._hbf.drain()
-            if not completions:
-                return 0.0
-            return (max(c.latency_ns for c in completions) / 1e6) / num_layers
+            sra = getattr(self._config, "hbf_sra", False)
+            if sra:
+                # HBF-SRA: NMP scored ALL cold K near-memory (QK^T done in the HBF),
+                # so the GPU does only the AV GEMV: it reads sparse V (KV/2) from the
+                # planes and receives the scores A from the NMP over the same bus.
+                #   T = max(T_hbm, T_score) + T_send(A + sparse_V);  T_hbm = 0 here.
+                a_bytes = self._hbf_sra_scores_bytes(total_selected_blocks)
+                flash_sparse_ms = self._plane_sparse_read_ms(
+                    blocks_per_plane_sparse, self._kv_block_bytes / 2.0,
+                    extra_bus_bytes=a_bytes)
+                t_score_ms = self._hbf_sra_score_ms(total_dense_blocks)
+                return (t_score_ms + flash_sparse_ms) / num_layers
+
+            # Dense/Sparse: GPU reads the full KV block (K+V) and does both GEMVs.
+            flash_sparse_ms = self._plane_sparse_read_ms(
+                blocks_per_plane_sparse, self._kv_block_bytes)
+            return flash_sparse_ms / num_layers
 
     # ──────────────────────────────────────────────────────────────────────
     # Step boundary: reset HBM clock before each batch

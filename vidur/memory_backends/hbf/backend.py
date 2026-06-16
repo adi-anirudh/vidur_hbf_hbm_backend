@@ -134,6 +134,12 @@ class HBFSimBackend(MemoryBackend):
         page_bytes   = self._cfg.subarray.page_size_bytes
         return total_planes * page_bytes / self._cfg.subarray.tR_ns  # bytes/ns = GB/s
 
+    def bus_bandwidth_bpns(self) -> float:
+        """Shared HBF read-return / TSV bus bandwidth (bytes/ns = GB/s). Data from
+        all planes streams out over this bus, so it caps achieved flash bandwidth.
+        0.0 = uncapped (no bus model in config)."""
+        return float(self._cfg.bus_bandwidth_gbps)
+
     def capacity_per_plane_bytes(self) -> int:
         """Capacity of one plane: blocks_per_plane x pages_per_block x page_size."""
         return self._mapper.capacity_per_plane_bytes()

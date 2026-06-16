@@ -41,11 +41,21 @@ MODELS = [
     "meta-llama/Meta-Llama-3-70B",
     "Qwen/Qwen-72B",
     "Qwen/Qwen2-72B",
+    # frontier / MoE additions (Blackwell now; A100/H100 via Colab)
+    "meta-llama/Meta-Llama-3.1-405B",
+    "meta-llama/Llama-3.3-70B-Instruct",
+    "mistralai/Mixtral-8x22B-v0.1",
+    "Qwen/Qwen3-235B-A22B",
+    "Qwen/Qwen3-Coder-480B-A35B-Instruct",
 ]
-DEVICES = ["blackwell", "a100", "h100", "h200"]
+DEVICES = ["blackwell"]
 BATCHES = [1, 2, 4, 8, 16, 32, 64, 128]
 CONTEXTS = [4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576]
-BASELINES = [("Dense", 1.0), ("Sparse", 0.1)]
+# HBF-SRA dropped: HBM and HBF cannot be accessed simultaneously, and NMP scores
+# on HBF data cannot be buffered (no write-back to flash; PCIe-to-GPU << HBF BW), so
+# sparsity-identification cannot overlap dense compute without approximate scoring.
+# Faithful Dense/Sparse re-run with the bus-capped max-BW flash model.
+BASELINES = [("Dense", 1.0, False), ("Sparse", 0.1, False)]
 
 DECODE_TOKENS = 4
 NUM_REQUESTS = 8
@@ -60,12 +70,18 @@ def has_trace(model: str, device: str) -> bool:
     return (d / "mlp.csv").exists() and (d / "attention.csv").exists()
 
 
-def run_point(model, device, batch, ctx, tp, label, sparsity, timeout_s):
+def run_point(model, device, batch, ctx, tp, label, sparsity, hbf_sra, timeout_s):
     cmd = [PY, RUNNER, "--model", model, "--device", device,
            "--batch_size", str(batch), "--context_length", str(ctx),
-           "--decode_tokens", str(DECODE_TOKENS), "--num_requests", str(NUM_REQUESTS),
+           "--decode_tokens", str(DECODE_TOKENS),
+           # num_requests = batch_size: fill the batch in ONE wave so there's no
+           # queueing/preemption contaminating the normalized TPOT (the dead-batch
+           # F1/F2 fix). Otherwise low-batch TPOT is inflated and the batch axis inverts.
+           "--num_requests", str(batch),
            "--tensor_parallel_size", str(tp), "--sparsity_fraction", str(sparsity),
            "--hbfsim_toml", TOML]
+    if hbf_sra:
+        cmd.append("--hbf_sra")
     t0 = time.perf_counter()
     try:
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s, cwd=str(ROOT))
@@ -112,7 +128,7 @@ def main():
             for batch in BATCHES:
                 for ctx in CONTEXTS:
                     tp, foot, ok = select_tp(model, device, batch, ctx)
-                    for label, sp in BASELINES:
+                    for label, sp, sra in BASELINES:
                         base = dict(model=model, device=device, batch=batch,
                                     context_length=ctx, baseline=label, tp=tp,
                                     footprint_gb=f"{foot:.1f}", sparsity_fraction=sp,
@@ -124,15 +140,15 @@ def main():
                         elif not trace:
                             w.writerow({**base, "status": "NO_TRACE"}); n_skip += 1
                         else:
-                            runnable.append(base)
+                            runnable.append((base, sra))
     fh.flush()
     print(f"runnable sim points: {len(runnable)}   pre-marked (infeasible/no-trace/done): {n_skip}")
 
     with ProcessPoolExecutor(max_workers=args.workers) as ex:
         futs = {ex.submit(run_point, b["model"], b["device"], b["batch"],
                           b["context_length"], b["tp"], b["baseline"],
-                          b["sparsity_fraction"], args.timeout): b
-                for b in runnable}
+                          b["sparsity_fraction"], sra, args.timeout): b
+                for (b, sra) in runnable}
         n = 0
         for fut in as_completed(futs):
             b = futs[fut]; res = fut.result()

@@ -670,6 +670,23 @@ class HBFLinearRegressionExecutionTimePredictorConfig(
         },
     )
 
+    hbf_sra: bool = field(
+        default=False,
+        metadata={
+            "help": (
+                "HBF-SRA baseline: a near-memory processor (NMP) in the HBF scores "
+                "the ENTIRE cold K (actual KV, not metadata) to select the sparse "
+                "set, THEN the GPU reads only sparsity_fraction of K+V and computes "
+                "(serial). Decode time = T_score + T_sparse_read. Scoring is "
+                "compute-bound: T_score = score_FLOPs / (nmp_flops_per_byte x flash_BW)."
+            )
+        },
+    )
+    nmp_flops_per_byte: float = field(
+        default=2.0,
+        metadata={"help": "NMP compute budget (FLOPS per byte) for HBF-SRA scoring."},
+    )
+
     @staticmethod
     def get_type():
         return ExecutionTimePredictorType.HBF_LINEAR_REGRESSION

@@ -39,6 +39,11 @@ def build_argv(args, output_dir):
         "--replica_config_device",               args.device,
         "--replica_config_num_pipeline_stages",  "1",
         "--replica_config_tensor_parallel_size", str(args.tensor_parallel_size),
+        # NVLink collective profile. pairwise_nvlink only has 2/4-worker all_reduce,
+        # so TP=8 needs a DGX (8-GPU) profile. Blackwell has no measured collective
+        # in-repo -> we proxy with a real 8-GPU NVLink profile; the all_reduce is a
+        # <1%% additive vs the flash-dominated decode TPOT.
+        "--replica_config_network_device",       args.network_device,
         # In-repo HBF predictor (LinearRegression base + NAND plane model)
         "--execution_time_predictor_config_type", PRED,
         PFX + "kv_cache_prediction_granularity", str(gran),
@@ -75,6 +80,8 @@ def build_argv(args, output_dir):
         "--no-metrics_config_enable_chrome_trace",
         "--log_level", "warning",
     ]
+    if args.hbf_sra:   # store_true bool flag (default False -> omit)
+        argv.append(PFX + "hbf_sra")
     return argv
 
 
@@ -88,8 +95,14 @@ def main():
     p.add_argument("--num_requests", type=int, default=8)
     p.add_argument("--qps", type=float, default=1000.0)
     p.add_argument("--tensor_parallel_size", type=int, default=1)
+    # h100_dgx covers 2/4/8-worker NVLink all_reduce (pairwise only 2/4). Used as a
+    # Blackwell collective proxy; <1% of flash-dominated decode TPOT.
+    p.add_argument("--network_device", default="h100_dgx")
     p.add_argument("--sparsity_fraction", type=float, default=1.0)
     p.add_argument("--hbm_kv_fraction", type=float, default=0.0)
+    p.add_argument("--hbf_sra", action="store_true",
+                   help="HBF-SRA baseline: in-flash NMP scoring of all cold K, "
+                        "then GPU sparse read.")
     p.add_argument("--num_kv_blocks", type=int, default=0)
     p.add_argument("--hbfsim_toml", default="configs/hbf_paper.toml")
     p.add_argument("--cache_dir", default="",
