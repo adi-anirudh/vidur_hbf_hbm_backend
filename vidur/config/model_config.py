@@ -263,35 +263,6 @@ class DeepSeek67BModelConfig(Llama2ModelConfig):
 
 
 @dataclass
-class DeepSeekV3ModelConfig(Llama2ModelConfig):
-    """DeepSeek-V3 (671B MoE) for HBF studies; uses Llama-2-70b-hf profiling
-    for the compute-bound sklearn terms. Pair with the HBF predictor's MoE
-    knobs: num_experts=256, moe_top_k=8, moe_intermediate=2048,
-    moe_dtype_bytes=1 (fp8), shared_expert_intermediate=2048.
-
-    Attention heads are a SYNTHETIC factorization, not V3's real MLA geometry
-    (128 heads with decoupled RoPE): they are chosen so the GQA KV formula
-    2 * num_kv_heads * head_dim reproduces V3's compressed-MLA KV cache
-    exactly — head_dim = 7168 // 224 = 32, so KV/token/layer
-    = 2 * 9 * 32 = 576 elements = kv_lora_rank(512) + qk_rope_head_dim(64),
-    i.e. 1152 bytes fp16. Head counts only enter the simulator through this
-    product (KV bytes, weight bytes), never as a standalone head count.
-    """
-    num_layers: int = 61
-    num_q_heads: int = 224
-    num_kv_heads: int = 9
-    embedding_dim: int = 7168
-    mlp_hidden_dim: int = 18432   # dense-layer FFN (first 3 layers); routed experts come from the predictor's moe_* knobs
-    max_position_embeddings: int = 163840
-    rope_theta: Optional[float] = 10000
-    vocab_size: int = 32768   # set to match Llama-2-70b-hf profiling source
-
-    @staticmethod
-    def get_name():
-        return "deepseek-ai/DeepSeek-V3"
-
-
-@dataclass
 class Qwen2_72BModelConfig(QwenModelConfig):
     num_layers: int = 80
     num_q_heads: int = 64

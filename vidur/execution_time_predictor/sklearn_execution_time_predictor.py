@@ -67,12 +67,9 @@ class SklearnExecutionTimePredictor(BaseExecutionTimePredictor):
             * self._replica_config.tensor_parallel_size
         )
         devices_per_node = self._replica_config.node_config.num_devices_per_node
-        if not (num_workers < devices_per_node or num_workers % devices_per_node == 0):
-            logger.warning(
-                f"num_workers ({num_workers}) is not sub-node or a whole-node "
-                f"multiple of devices_per_node ({devices_per_node}); assuming a "
-                f"flat NVLink domain for collective timings."
-            )
+        assert (
+            num_workers < devices_per_node or num_workers % devices_per_node == 0
+        ), "Number of workers should be less than devices per node or a multiple of devices per node"
 
         self._is_multi_node = num_workers > devices_per_node
 
@@ -460,15 +457,6 @@ class SklearnExecutionTimePredictor(BaseExecutionTimePredictor):
 
         return predictions
 
-    def _skip_tensor_parallel_all_reduce(self) -> bool:
-        return bool(
-            getattr(self._config, "assume_dp_attention", False)
-            or (
-                getattr(self._config, "disagg_num_moe_gpus", 0) > 0
-                and getattr(self._config, "disagg_expert_placement", "") == "replicated"
-            )
-        )
-
     def _train_compute_models(self) -> Dict[str, BaseEstimator]:
         compute_df = self._load_compute_df(self._compute_input_file)
         compute_df = self._get_compute_df_with_derived_features(compute_df)
@@ -523,10 +511,7 @@ class SklearnExecutionTimePredictor(BaseExecutionTimePredictor):
                 target_col="time_stats.send_recv.median",
             )
 
-        if (
-            self._replica_config.tensor_parallel_size > 1
-            and not self._skip_tensor_parallel_all_reduce()
-        ):
+        if self._replica_config.tensor_parallel_size > 1:
             all_reduce_df = self._load_all_reduce_df(self._all_reduce_input_file)
             all_reduce_df = self._get_all_reduce_df_with_derived_features(all_reduce_df)
 
@@ -628,10 +613,7 @@ class SklearnExecutionTimePredictor(BaseExecutionTimePredictor):
         if self._replica_config.num_pipeline_stages > 1:
             model_names.append("send_recv")
 
-        if (
-            self._replica_config.tensor_parallel_size > 1
-            and not self._skip_tensor_parallel_all_reduce()
-        ):
+        if self._replica_config.tensor_parallel_size > 1:
             model_names.append("all_reduce")
 
         num_token_range = np.arange(1, self._max_tokens + 1)

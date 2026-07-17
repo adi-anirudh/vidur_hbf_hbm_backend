@@ -1,7 +1,0 @@
-workload,context_length,sessions,microbatch_count,sessions_per_microbatch,gpu_budget,gpus,attention_gpus,moe_gpus,hbf_label,hbf_gpus,hbm_gpus,policy,source_raw_attention_ms,source_raw_moe_ms_mean,source_raw_step_ms_mean,source_raw_step_ms_p95,source_selection_reason,decode_tokens,status,error
-mixed,8192,64,2,32.0,16,16,1,15,2,2,13,hybrid_hbf_dynamic,44.413824,47.469200210511616,47.469200210511616,47.469200210511616,hybrid_raw_min_step_by_hbf_label,128,pending,
-mixed,8192,64,2,32.0,16,16,1,15,4,4,11,hybrid_hbf_dynamic,44.413824,44.91813355374362,44.91813355374362,44.91813355374362,hybrid_raw_min_step_by_hbf_label,128,pending,
-mixed,8192,64,2,32.0,16,16,2,14,all,14,0,hybrid_hbf_dynamic,35.419008,43.65626366725689,43.65626366725689,43.65626366725689,hybrid_raw_min_step_by_hbf_label,128,pending,
-mixed,65536,64,2,32.0,16,16,5,11,2,2,9,hybrid_hbf_dynamic,57.906048,57.72866607281909,57.906048,57.906048,hybrid_raw_min_step_by_hbf_label,128,pending,
-mixed,65536,64,2,32.0,16,16,5,11,4,4,7,hybrid_hbf_dynamic,57.906048,56.42383052113198,57.906048,57.906048,hybrid_raw_min_step_by_hbf_label,128,pending,
-mixed,65536,64,2,32.0,16,16,6,10,all,10,0,hybrid_hbf_dynamic,53.40864,57.36182191712334,57.36182191712334,57.36182191712334,hybrid_raw_min_step_by_hbf_label,128,pending,
