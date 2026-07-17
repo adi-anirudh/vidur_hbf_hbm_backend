@@ -9,7 +9,15 @@ class ParamCounter:
         self._model_config = self._replica_config.model_config
 
         assert (
+            self._model_config.num_q_heads % self._replica_config.tensor_parallel_size
+            == 0
+        )
+        assert (
             self._model_config.num_layers % self._replica_config.num_pipeline_stages
+            == 0
+        )
+        assert (
+            self._model_config.embedding_dim % self._replica_config.tensor_parallel_size
             == 0
         )
         assert self._model_config.embedding_dim % self._model_config.num_q_heads == 0
@@ -20,10 +28,8 @@ class ParamCounter:
         self._attention_head_dim = (
             self._model_config.embedding_dim // self._model_config.num_q_heads
         )
-        # ceil: uneven head counts (e.g. 224 heads / TP=12) put the extra
-        # head on some workers; size for the largest shard.
-        self._q_heads_per_tensor_parallel_worker = ceil(
-            self._model_config.num_q_heads / self._replica_config.tensor_parallel_size
+        self._q_heads_per_tensor_parallel_worker = (
+            self._model_config.num_q_heads // self._replica_config.tensor_parallel_size
         )
         self._kv_heads_per_tensor_parallel_worker = ceil(
             self._model_config.num_kv_heads / self._replica_config.tensor_parallel_size

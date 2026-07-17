@@ -24,8 +24,10 @@ class Replica(BaseEntity):
             self._model_config.num_layers % self._replica_config.num_pipeline_stages
             == 0
         )
-        # embedding_dim need not divide TP evenly: uneven shards are sized
-        # by the largest piece (ceil) in ParamCounter and the HBF predictor.
+        assert (
+            self._model_config.embedding_dim % self._replica_config.tensor_parallel_size
+            == 0
+        )
 
     @property
     def id(self) -> int:
@@ -73,8 +75,8 @@ class Replica(BaseEntity):
 
     @property
     def q_heads_per_tensor_parallel_worker(self) -> int:
-        return ceil(
-            self._model_config.num_q_heads / self._replica_config.tensor_parallel_size
+        return (
+            self._model_config.num_q_heads // self._replica_config.tensor_parallel_size
         )
 
     @property
