@@ -1,0 +1,90 @@
+{
+  "trace_root": "/home/agasthi/vidur/vidur_hbf_hbm_backend/paper_eval/experiments/deepseek_r1_awq_no_prune_replay",
+  "context_lengths": [
+    8192,
+    16384,
+    32768,
+    65536,
+    131072
+  ],
+  "sessions": [
+    8,
+    16,
+    32,
+    64,
+    128
+  ],
+  "microbatch_count": 2,
+  "moe_gpus": [
+    8,
+    16,
+    32
+  ],
+  "attention_gpus": 8,
+  "gpu_budgets": [
+    8,
+    16,
+    24,
+    32
+  ],
+  "optimize_am": true,
+  "run_points": [
+    {
+      "gpu_budget": 8,
+      "attention_gpus": 7,
+      "moe_gpus": 1
+    },
+    {
+      "gpu_budget": 8,
+      "attention_gpus": 6,
+      "moe_gpus": 2
+    },
+    {
+      "gpu_budget": 8,
+      "attention_gpus": 4,
+      "moe_gpus": 4
+    },
+    {
+      "gpu_budget": 16,
+      "attention_gpus": 14,
+      "moe_gpus": 2
+    },
+    {
+      "gpu_budget": 16,
+      "attention_gpus": 12,
+      "moe_gpus": 4
+    },
+    {
+      "gpu_budget": 16,
+      "attention_gpus": 8,
+      "moe_gpus": 8
+    },
+    {
+      "gpu_budget": 24,
+      "attention_gpus": 16,
+      "moe_gpus": 8
+    },
+    {
+      "gpu_budget": 24,
+      "attention_gpus": 8,
+      "moe_gpus": 16
+    },
+    {
+      "gpu_budget": 32,
+      "attention_gpus": 16,
+      "moe_gpus": 16
+    }
+  ],
+  "policies": [
+    "static",
+    "cost_dynamic"
+  ],
+  "workloads": [
+    "mixed"
+  ],
+  "decode_tokens": 128,
+  "slo_ms": 100.0,
+  "jobs": 8,
+  "no_pruning": true,
+  "simulator": "Vidur"
+}

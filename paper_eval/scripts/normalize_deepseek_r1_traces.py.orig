@@ -1,0 +1,598 @@
+#!/usr/bin/env python3
+"""Normalize DeepSeek-R1-AWQ expert-ID JSON traces into compact shards.
+
+The source dataset stores one JSON file per request.  Entry zero contains
+prefill routing while later entries contain one decode token.  This converter
+strictly validates the DeepSeek-R1 routed-expert schema, discards only a
+prefix-truncated *final* decode entry, and writes request-indexed uint8 shards
+for no-pruning replay.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import datetime as dt
+import hashlib
+import json
+import shutil
+import statistics
+import sys
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+PAPER_DIR = SCRIPT_DIR.parent
+DEFAULT_INPUT_ROOT = (
+    PAPER_DIR
+    / "experiments"
+    / "deepseek_r1_awq_trace_raw"
+    / "cognitivecomputations"
+    / "DeepSeek-R1-AWQ"
+)
+DEFAULT_OUTPUT_DIR = PAPER_DIR / "experiments" / "deepseek_r1_awq_no_prune_replay"
+
+N_LAYERS = 61
+FIRST_MOE_LAYER = 3
+MOE_LAYER_INDICES = tuple(range(FIRST_MOE_LAYER, N_LAYERS))
+N_MOE_LAYERS = len(MOE_LAYER_INDICES)
+N_ROUTED_EXPERTS = 256
+TOP_K = 8
+FORMAT_VERSION = 1
+REQUEST_FIELDS = (
+    "request_index",
+    "relative_path",
+    "workload",
+    "category",
+    "source_bytes",
+    "split",
+    "prompt_tokens",
+    "raw_decode_entries",
+    "valid_decode_tokens",
+    "discarded_decode_entries",
+    "shard",
+    "shard_request_index",
+    "token_offset_start",
+    "token_offset_end",
+)
+DISCARD_FIELDS = (
+    "request_index",
+    "relative_path",
+    "outer_entry_index",
+    "reason",
+    "present_layer_count",
+    "highest_present_layer",
+    "missing_layers",
+)
+SHARD_FIELDS = (
+    "shard",
+    "request_count",
+    "token_count",
+    "bytes",
+    "sha256",
+)
+
+
+class TraceValidationError(ValueError):
+    """Raised when a source trace violates a non-recoverable invariant."""
+
+
+@dataclass
+class NormalizedRequest:
+    expert_ids: np.ndarray
+    prompt_tokens: int
+    valid_decode_tokens: int
+    raw_decode_entries: int
+    discard: dict[str, Any] | None
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--input-root", type=Path, default=DEFAULT_INPUT_ROOT)
+    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    parser.add_argument("--requests-per-shard", type=int, default=256)
+    parser.add_argument("--test-fraction", type=float, default=0.20)
+    parser.add_argument("--split-seed", default="flexep-r1-awq-no-prune-v1")
+    parser.add_argument(
+        "--limit",
+        type=int,
+        help="Convert only the first N sorted requests (for validation runs).",
+    )
+    parser.add_argument(
+        "--replace-generated",
+        action="store_true",
+        help="Replace only generated shards/manifests in the output directory.",
+    )
+    parser.add_argument("--progress-every", type=int, default=250)
+    return parser.parse_args()
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(4 * 1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def deterministic_split(relative_path: str, seed: str, test_fraction: float) -> str:
+    digest = hashlib.sha256(f"{seed}\0{relative_path}".encode("utf-8")).digest()
+    value = int.from_bytes(digest[:8], "big") / 2**64
+    return "test" if value < test_fraction else "train"
+
+
+def parse_layer_keys(item: Any, context: str) -> list[int]:
+    if not isinstance(item, dict):
+        raise TraceValidationError(f"{context}: expected a layer dictionary")
+    try:
+        keys = sorted(int(key) for key in item)
+    except (TypeError, ValueError) as error:
+        raise TraceValidationError(f"{context}: non-integer layer key") from error
+    if len(keys) != len(set(keys)):
+        raise TraceValidationError(f"{context}: duplicate integer layer key")
+    return keys
+
+
+def incomplete_final_entry_info(item: Any) -> dict[str, Any] | None:
+    """Describe a final decode capture that ends at a layer suffix boundary.
+
+    The collector can stop either before writing later layer keys or after
+    writing a key whose value remains null. We accept only a contiguous valid
+    prefix followed exclusively by absent/null layers. Malformed lists, bad
+    IDs, or gaps followed by more routing data remain hard errors.
+    """
+    try:
+        keys = parse_layer_keys(item, "final decode entry")
+    except TraceValidationError:
+        return None
+    if not keys or keys != list(range(keys[-1] + 1)) or keys[-1] >= N_LAYERS:
+        return None
+    for layer in range(FIRST_MOE_LAYER):
+        if str(layer) not in item or item[str(layer)] is not None:
+            return None
+
+    first_incomplete: int | None = None
+    for layer in MOE_LAYER_INDICES:
+        value = item.get(str(layer))
+        if value is None:
+            if first_incomplete is None:
+                first_incomplete = layer
+            continue
+        if first_incomplete is not None:
+            return None
+        array = np.asarray(value) if isinstance(value, list) else np.asarray([])
+        if array.shape != (1, TOP_K) or array.dtype.kind not in "iu":
+            return None
+        if int(array.min()) < 0 or int(array.max()) >= N_ROUTED_EXPERTS:
+            return None
+        if np.any(np.diff(np.sort(array, axis=-1), axis=-1) == 0):
+            return None
+
+    if first_incomplete is None:
+        return None
+    return {
+        "reason": "suffix-incomplete final decode entry",
+        "present_layer_count": first_incomplete,
+        "highest_present_layer": first_incomplete - 1,
+        "missing_layers": ";".join(
+            str(layer) for layer in range(first_incomplete, N_LAYERS)
+        ),
+    }
+
+
+def normalize_complete_entry(
+    item: Any,
+    expected_tokens: int | None,
+    context: str,
+) -> np.ndarray:
+    keys = parse_layer_keys(item, context)
+    expected_keys = list(range(N_LAYERS))
+    if keys != expected_keys:
+        missing = sorted(set(expected_keys) - set(keys))
+        extra = sorted(set(keys) - set(expected_keys))
+        raise TraceValidationError(
+            f"{context}: layer keys differ; missing={missing}, extra={extra}"
+        )
+
+    for layer in range(FIRST_MOE_LAYER):
+        if item[str(layer)] is not None:
+            raise TraceValidationError(f"{context}: dense layer {layer} is not null")
+
+    reference = item[str(FIRST_MOE_LAYER)]
+    if not isinstance(reference, list):
+        raise TraceValidationError(f"{context}: MoE layer {FIRST_MOE_LAYER} is not a list")
+    token_count = len(reference)
+    if expected_tokens is not None and token_count != expected_tokens:
+        raise TraceValidationError(
+            f"{context}: expected {expected_tokens} token rows, found {token_count}"
+        )
+    if token_count <= 0:
+        raise TraceValidationError(f"{context}: contains no routed tokens")
+
+    normalized = np.empty((token_count, N_MOE_LAYERS, TOP_K), dtype=np.uint8)
+    for output_layer, model_layer in enumerate(MOE_LAYER_INDICES):
+        values = item[str(model_layer)]
+        if not isinstance(values, list):
+            raise TraceValidationError(f"{context}: MoE layer {model_layer} is not a list")
+        array = np.asarray(values)
+        if array.shape != (token_count, TOP_K):
+            raise TraceValidationError(
+                f"{context}: layer {model_layer} has shape {array.shape}, "
+                f"expected {(token_count, TOP_K)}"
+            )
+        if array.dtype.kind not in "iu":
+            raise TraceValidationError(
+                f"{context}: layer {model_layer} expert IDs are not integers"
+            )
+        if int(array.min()) < 0 or int(array.max()) >= N_ROUTED_EXPERTS:
+            raise TraceValidationError(
+                f"{context}: layer {model_layer} expert ID outside 0..255"
+            )
+        if np.any(np.diff(np.sort(array, axis=-1), axis=-1) == 0):
+            raise TraceValidationError(
+                f"{context}: layer {model_layer} has duplicate top-8 expert IDs"
+            )
+        normalized[:, output_layer, :] = array.astype(np.uint8, copy=False)
+    return normalized
+
+
+def normalize_request(path: Path) -> NormalizedRequest:
+    try:
+        with path.open("r", encoding="utf-8") as stream:
+            entries = json.load(stream)
+    except (OSError, json.JSONDecodeError) as error:
+        raise TraceValidationError(f"{path}: cannot read JSON: {error}") from error
+
+    if not isinstance(entries, list) or not entries:
+        raise TraceValidationError(f"{path}: top level must be a non-empty list")
+
+    prefill = normalize_complete_entry(entries[0], None, f"{path}: prefill")
+    decode_arrays: list[np.ndarray] = []
+    discard: dict[str, Any] | None = None
+    last_index = len(entries) - 1
+    for entry_index, item in enumerate(entries[1:], start=1):
+        context = f"{path}: decode entry {entry_index}"
+        try:
+            decode_arrays.append(normalize_complete_entry(item, 1, context))
+        except TraceValidationError:
+            incomplete = incomplete_final_entry_info(item) if entry_index == last_index else None
+            if incomplete is None:
+                raise
+            discard = {
+                "outer_entry_index": entry_index,
+                **incomplete,
+            }
+
+    arrays = [prefill, *decode_arrays]
+    expert_ids = np.concatenate(arrays, axis=0)
+    return NormalizedRequest(
+        expert_ids=expert_ids,
+        prompt_tokens=int(prefill.shape[0]),
+        valid_decode_tokens=len(decode_arrays),
+        raw_decode_entries=len(entries) - 1,
+        discard=discard,
+    )
+
+
+class ShardWriter:
+    def __init__(self, shard_dir: Path, requests_per_shard: int):
+        self.shard_dir = shard_dir
+        self.requests_per_shard = requests_per_shard
+        self.shard_index = 0
+        self.arrays: list[np.ndarray] = []
+        self.request_indices: list[int] = []
+        self.prompt_lengths: list[int] = []
+        self.decode_lengths: list[int] = []
+        self.test_flags: list[bool] = []
+        self.rows: list[dict[str, Any]] = []
+        self.shard_rows: list[dict[str, Any]] = []
+
+    def add(
+        self,
+        normalized: NormalizedRequest,
+        request_index: int,
+        split: str,
+        manifest_row: dict[str, Any],
+    ) -> None:
+        shard_name = f"shard_{self.shard_index:05d}.npz"
+        start = sum(array.shape[0] for array in self.arrays)
+        end = start + normalized.expert_ids.shape[0]
+        manifest_row.update(
+            {
+                "shard": shard_name,
+                "shard_request_index": len(self.arrays),
+                "token_offset_start": start,
+                "token_offset_end": end,
+            }
+        )
+        self.arrays.append(normalized.expert_ids)
+        self.request_indices.append(request_index)
+        self.prompt_lengths.append(normalized.prompt_tokens)
+        self.decode_lengths.append(normalized.valid_decode_tokens)
+        self.test_flags.append(split == "test")
+        self.rows.append(manifest_row)
+        if len(self.arrays) >= self.requests_per_shard:
+            self.flush()
+
+    def flush(self) -> None:
+        if not self.arrays:
+            return
+        shard_name = f"shard_{self.shard_index:05d}.npz"
+        shard_path = self.shard_dir / shard_name
+        temporary = shard_path.with_suffix(".npz.tmp")
+        offsets = np.zeros(len(self.arrays) + 1, dtype=np.int64)
+        offsets[1:] = np.cumsum([array.shape[0] for array in self.arrays])
+        expert_ids = np.concatenate(self.arrays, axis=0)
+        with temporary.open("wb") as stream:
+            np.savez(
+                stream,
+                format_version=np.asarray(FORMAT_VERSION, dtype=np.uint8),
+                expert_ids=expert_ids,
+                request_offsets=offsets,
+                request_indices=np.asarray(self.request_indices, dtype=np.int32),
+                prompt_lengths=np.asarray(self.prompt_lengths, dtype=np.int32),
+                decode_lengths=np.asarray(self.decode_lengths, dtype=np.int16),
+                split_is_test=np.asarray(self.test_flags, dtype=np.bool_),
+                moe_layer_indices=np.asarray(MOE_LAYER_INDICES, dtype=np.uint8),
+                n_routed_experts=np.asarray(N_ROUTED_EXPERTS, dtype=np.int16),
+                top_k=np.asarray(TOP_K, dtype=np.uint8),
+            )
+        temporary.replace(shard_path)
+        self.shard_rows.append(
+            {
+                "shard": shard_name,
+                "request_count": len(self.arrays),
+                "token_count": int(expert_ids.shape[0]),
+                "bytes": shard_path.stat().st_size,
+                "sha256": sha256_file(shard_path),
+            }
+        )
+        self.shard_index += 1
+        self.arrays.clear()
+        self.request_indices.clear()
+        self.prompt_lengths.clear()
+        self.decode_lengths.clear()
+        self.test_flags.clear()
+
+
+def write_csv(path: Path, fields: tuple[str, ...], rows: list[dict[str, Any]]) -> None:
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    with temporary.open("w", encoding="utf-8", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(rows)
+    temporary.replace(path)
+
+
+def discover_source_revision(input_root: Path) -> tuple[str | None, int]:
+    local_dir = input_root.parents[1]
+    metadata_root = local_dir / ".cache" / "huggingface" / "download"
+    metadata_files = list(metadata_root.rglob("*.metadata")) if metadata_root.exists() else []
+    if not metadata_files:
+        return None, 0
+    with metadata_files[0].open("r", encoding="utf-8") as stream:
+        revision = stream.readline().strip() or None
+    return revision, len(metadata_files)
+
+
+def prepare_output(output_dir: Path, replace_generated: bool) -> tuple[Path, Path]:
+    shard_dir = output_dir / "normalized" / "shards"
+    manifest_dir = output_dir / "manifests"
+    generated_paths = [shard_dir, manifest_dir, output_dir / "summary.json"]
+    existing = [path for path in generated_paths if path.exists()]
+    if existing and not replace_generated:
+        rendered = ", ".join(str(path) for path in existing)
+        raise FileExistsError(
+            f"generated outputs already exist: {rendered}; pass --replace-generated"
+        )
+    if replace_generated:
+        for path in existing:
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+    shard_dir.mkdir(parents=True, exist_ok=True)
+    manifest_dir.mkdir(parents=True, exist_ok=True)
+    return shard_dir, manifest_dir
+
+
+def summarize(
+    args: argparse.Namespace,
+    source_revision: str | None,
+    metadata_file_count: int,
+    request_rows: list[dict[str, Any]],
+    discard_rows: list[dict[str, Any]],
+    shard_rows: list[dict[str, Any]],
+    started_at: str,
+    elapsed_seconds: float,
+) -> dict[str, Any]:
+    workloads: dict[str, dict[str, int]] = {}
+    for row in request_rows:
+        bucket = workloads.setdefault(
+            row["workload"],
+            {
+                "requests": 0,
+                "train_requests": 0,
+                "test_requests": 0,
+                "prompt_tokens": 0,
+                "decode_tokens": 0,
+                "discarded_final_entries": 0,
+            },
+        )
+        bucket["requests"] += 1
+        bucket[f"{row['split']}_requests"] += 1
+        bucket["prompt_tokens"] += int(row["prompt_tokens"])
+        bucket["decode_tokens"] += int(row["valid_decode_tokens"])
+        bucket["discarded_final_entries"] += int(row["discarded_decode_entries"])
+
+    prompt_lengths = [int(row["prompt_tokens"]) for row in request_rows]
+    decode_lengths = [int(row["valid_decode_tokens"]) for row in request_rows]
+    return {
+        "format_version": FORMAT_VERSION,
+        "generated_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "started_at_utc": started_at,
+        "elapsed_seconds": elapsed_seconds,
+        "source": {
+            "model_trace": "cognitivecomputations/DeepSeek-R1-AWQ",
+            "input_root": str(args.input_root.resolve()),
+            "dataset_revision": source_revision,
+            "local_metadata_files": metadata_file_count,
+            "trace_provenance": "4-bit AWQ checkpoint routing",
+        },
+        "schema": {
+            "dense_layers": [0, 1, 2],
+            "moe_layer_indices": list(MOE_LAYER_INDICES),
+            "n_moe_layers": N_MOE_LAYERS,
+            "n_routed_experts": N_ROUTED_EXPERTS,
+            "top_k": TOP_K,
+            "expert_id_dtype": "uint8",
+            "request_tensor": "[prefill_tokens + valid_decode_tokens, 58, 8]",
+            "router_weights_present": False,
+            "token_ids_present": False,
+        },
+        "split": {
+            "method": "SHA-256(relative_path, seed), request-level",
+            "seed": args.split_seed,
+            "requested_test_fraction": args.test_fraction,
+            "train_requests": sum(row["split"] == "train" for row in request_rows),
+            "test_requests": sum(row["split"] == "test" for row in request_rows),
+        },
+        "totals": {
+            "requests": len(request_rows),
+            "prompt_tokens": sum(prompt_lengths),
+            "valid_decode_tokens": sum(decode_lengths),
+            "routed_token_records": sum(prompt_lengths) + sum(decode_lengths),
+            "discarded_final_decode_entries": len(discard_rows),
+            "shards": len(shard_rows),
+            "normalized_shard_bytes": sum(int(row["bytes"]) for row in shard_rows),
+        },
+        "lengths": {
+            "prompt_min": min(prompt_lengths),
+            "prompt_median": statistics.median(prompt_lengths),
+            "prompt_max": max(prompt_lengths),
+            "decode_min": min(decode_lengths),
+            "decode_median": statistics.median(decode_lengths),
+            "decode_max": max(decode_lengths),
+        },
+        "workloads": dict(sorted(workloads.items())),
+        "discard_policy": (
+            "Only a final decode entry whose integer layer keys form a strict "
+            "prefix 0..k with k<60 is discarded. Any other malformed entry aborts conversion."
+        ),
+        "shard_layout": {
+            "requests_per_shard": args.requests_per_shard,
+            "expert_ids": "concatenated uint8 [token, 58, 8]",
+            "request_offsets": "int64 offsets into expert_ids",
+            "request_indices": "global request indices matching manifests/requests.csv",
+            "prompt_lengths": "int32",
+            "decode_lengths": "int16",
+            "split_is_test": "bool",
+        },
+        "command": [sys.executable, *sys.argv],
+    }
+
+
+def convert(args: argparse.Namespace) -> dict[str, Any]:
+    if args.requests_per_shard <= 0:
+        raise ValueError("--requests-per-shard must be positive")
+    if not 0.0 < args.test_fraction < 1.0:
+        raise ValueError("--test-fraction must be between zero and one")
+    if args.limit is not None and args.limit <= 0:
+        raise ValueError("--limit must be positive")
+
+    input_root = args.input_root.resolve()
+    output_dir = args.output_dir.resolve()
+    if not input_root.is_dir():
+        raise FileNotFoundError(f"input root not found: {input_root}")
+    source_files = sorted(input_root.rglob("*.json"))
+    if args.limit is not None:
+        source_files = source_files[: args.limit]
+    if not source_files:
+        raise FileNotFoundError(f"no JSON traces under {input_root}")
+
+    shard_dir, manifest_dir = prepare_output(output_dir, args.replace_generated)
+    source_revision, metadata_file_count = discover_source_revision(input_root)
+    writer = ShardWriter(shard_dir, args.requests_per_shard)
+    request_rows: list[dict[str, Any]] = []
+    discard_rows: list[dict[str, Any]] = []
+    started = time.monotonic()
+    started_at = dt.datetime.now(dt.timezone.utc).isoformat()
+
+    for request_index, source_path in enumerate(source_files):
+        relative_path = source_path.relative_to(input_root).as_posix()
+        parts = Path(relative_path).parts
+        workload = parts[0]
+        category = "/".join(parts[1:-1])
+        normalized = normalize_request(source_path)
+        split = deterministic_split(relative_path, args.split_seed, args.test_fraction)
+        request_row: dict[str, Any] = {
+            "request_index": request_index,
+            "relative_path": relative_path,
+            "workload": workload,
+            "category": category,
+            "source_bytes": source_path.stat().st_size,
+            "split": split,
+            "prompt_tokens": normalized.prompt_tokens,
+            "raw_decode_entries": normalized.raw_decode_entries,
+            "valid_decode_tokens": normalized.valid_decode_tokens,
+            "discarded_decode_entries": int(normalized.discard is not None),
+        }
+        writer.add(normalized, request_index, split, request_row)
+        request_rows.append(request_row)
+        if normalized.discard is not None:
+            discard_rows.append(
+                {
+                    "request_index": request_index,
+                    "relative_path": relative_path,
+                    **normalized.discard,
+                }
+            )
+        completed = request_index + 1
+        if args.progress_every and (
+            completed % args.progress_every == 0 or completed == len(source_files)
+        ):
+            elapsed = time.monotonic() - started
+            print(
+                f"normalized {completed}/{len(source_files)} requests "
+                f"({completed / elapsed:.1f} requests/s), "
+                f"discarded final entries={len(discard_rows)}",
+                flush=True,
+            )
+
+    writer.flush()
+    write_csv(manifest_dir / "requests.csv", REQUEST_FIELDS, request_rows)
+    write_csv(manifest_dir / "discarded_entries.csv", DISCARD_FIELDS, discard_rows)
+    write_csv(manifest_dir / "shards.csv", SHARD_FIELDS, writer.shard_rows)
+    elapsed_seconds = time.monotonic() - started
+    summary = summarize(
+        args,
+        source_revision,
+        metadata_file_count,
+        request_rows,
+        discard_rows,
+        writer.shard_rows,
+        started_at,
+        elapsed_seconds,
+    )
+    summary_path = output_dir / "summary.json"
+    temporary = summary_path.with_suffix(".json.tmp")
+    with temporary.open("w", encoding="utf-8") as stream:
+        json.dump(summary, stream, indent=2, ensure_ascii=False)
+        stream.write("\n")
+    temporary.replace(summary_path)
+    print(f"wrote {len(writer.shard_rows)} shards to {shard_dir}", flush=True)
+    print(f"summary: {summary_path}", flush=True)
+    return summary
+
+
+def main() -> None:
+    convert(parse_args())
+
+
+if __name__ == "__main__":
+    main()

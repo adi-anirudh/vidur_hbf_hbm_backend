@@ -1,0 +1,49 @@
+{
+  "candidate_csv": "/home/agasthi/vidur/vidur_hbf_hbm_backend/paper_eval/experiments/deepseek_r1_awq_task3_balanced_am/full_mu2_exact_jobs8/results/all_splits.csv",
+  "trace_root": "/home/agasthi/vidur/vidur_hbf_hbm_backend/paper_eval/experiments/deepseek_r1_awq_no_prune_replay",
+  "outdir": "paper_eval/experiments/deepseek_r1_awq_task3_vidur/balanced_am_exact_profiledA_mu2_vidur_jobs8_thread1",
+  "allowed_attention_gpus": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    10,
+    12,
+    14,
+    16
+  ],
+  "selected_rows": 198,
+  "policies": [
+    "static",
+    "cost_dynamic"
+  ],
+  "workloads": [
+    "mixed"
+  ],
+  "context_lengths": null,
+  "sessions": [
+    8,
+    16,
+    32,
+    64,
+    128
+  ],
+  "gpu_budgets": [
+    8,
+    16,
+    24,
+    32
+  ],
+  "microbatch_count": 2,
+  "decode_tokens": 128,
+  "slo_ms": 100.0,
+  "trace_read_bw_gbps": 1024.0,
+  "disagg_link_bw_gbps": 900.0,
+  "jobs": 8,
+  "simulator": "Vidur",
+  "no_pruning": true
+}

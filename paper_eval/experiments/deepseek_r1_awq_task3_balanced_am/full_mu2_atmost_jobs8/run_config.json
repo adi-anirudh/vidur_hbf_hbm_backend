@@ -1,0 +1,41 @@
+{
+  "trace_root": "/home/agasthi/vidur/vidur_hbf_hbm_backend/paper_eval/experiments/deepseek_r1_awq_no_prune_replay",
+  "context_lengths": [
+    8192,
+    16384,
+    32768,
+    65536,
+    131072
+  ],
+  "sessions": [
+    8,
+    16,
+    32,
+    64,
+    128
+  ],
+  "gpu_budgets": [
+    8,
+    16,
+    24,
+    32
+  ],
+  "microbatch_count": 2,
+  "decode_tokens": 128,
+  "workloads": [
+    "mixed"
+  ],
+  "policies": [
+    "static",
+    "cost_dynamic"
+  ],
+  "budget_mode": "at_most",
+  "trace_max_requests": 512,
+  "trace_profile_max_requests": 0,
+  "hbm_bw_gbps": 1024.0,
+  "hbf_bw_gbps": 1024.0,
+  "link_bw_gbps": 900.0,
+  "slo_ms": 100.0,
+  "jobs": 8,
+  "objective": "minimize max(raw_attention_ms, raw_moe_ms)"
+}
