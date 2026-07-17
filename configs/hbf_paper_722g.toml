@@ -1,0 +1,99 @@
+# HBFSim config for paper sweep — matches Vidur hbf_default.toml hardware.
+#
+# HBF stack: 1 stack × 8 dies × 96 subarrays/die = 768 total parallelism units.
+# Peak BW   = 768 × 4 KB / 4096 ns = 768 GB/s.
+# Capacity  = 768 × 896 blocks × 256 pages × 4 KB ≈ 722 GB.
+#
+# HBM: ideal bandwidth source (no DRAMsim3 needed); the Vidur base predictor
+# already models HBM latency. The HBFSim overlay only counts the flash stall
+# that exceeds the base predictor estimate (overlap_with_compute=True).
+
+[simulation]
+max_cycles              = 2_000_000_000
+warmup_cycles           = 0
+freq_mhz                = 1000
+output_csv_path         = ""
+output_stats_json_path  = ""
+log_level               = 0
+
+[requester]
+trace_file              = ""        # wired to InMemoryTraceReader by pyhbfsim
+max_in_flight           = 65536
+issue_rate_per_cyc      = 768       # one command per plane per cycle at peak
+
+[host_bus]
+bandwidth_GBps          = 768.0     # HBF peak = 768 planes × 4KB / 4096ns
+base_latency_cycles     = 10
+queue_depth             = 65536
+cpu_compute_cycles      = 1
+
+[memory_model]
+address_space  = "composite"
+hbm_role       = "addressable"
+hbf_role       = "addressable"
+access_policy  = "address_partition"
+fabric         = "ideal_parallel"
+
+[address_mapping]
+policy             = "block_interleave"
+num_stacks         = 1
+num_channels       = 1
+num_dies_hbf       = 8
+num_subarrays_hbf  = 96
+page_size_bytes    = 4096
+pages_per_block    = 256
+hbm_base_addr      = "0x0"
+hbm_size_bytes     = "256 GB"      # generous; matches HbfsimAddrSpace in bridge
+hbf_base_addr      = "0x4000000000"
+hbf_size_bytes     = "1024 GB"
+allow_hbf_logical_overcommit = true   # 512 GB logical > 206 GB physical
+
+[hbf_controller]
+read_queue_depth              = 65536
+write_queue_depth             = 4096
+scheduler_type                = "fcfs"
+controller_latency_cycles     = 2
+enable_read_priority          = true
+max_outstanding_per_subarray  = 768   # full subarray-level parallelism
+
+  [hbf_controller.ftl]
+  policy                 = "page_mapping"
+  write_allocator        = "round_robin"
+  unmapped_read_policy   = "prepopulate"
+
+  [hbf_controller.gc]
+  policy          = "greedy"
+
+  [hbf_controller.wear_leveler]
+  policy          = "round_robin"
+
+  [hbf_controller.thermal]
+  policy          = "null"
+
+[logic_die]
+num_channels                  = 1
+num_dies_per_stack            = 8
+num_subarrays_per_die         = 96
+tsv_bandwidth_GBps            = 768   # peak HBF BW
+logic_die_freq_mhz            = 1000
+command_translation_cycles    = 2
+max_concurrent_subarray_cmds  = 768
+
+[nand_media]
+page_size_bytes           = 4096
+pages_per_block           = 256
+blocks_per_subarray       = 896
+blocks_per_plane          = 896    # capacity knob: 768 planes × 896 × 256 × 4KB ≈ 722 GB (672 GiB); BW unchanged (768 GB/s)
+num_dies_per_stack        = 8
+num_subarrays_per_die     = 96
+num_planes_per_die        = 96      # 1 subarray per plane → max multi-plane parallelism
+max_concurrent_per_plane  = 0       # auto: 1 subarray per plane → 1
+capacity_per_die_bytes    = 90194313216 # 96 × 896 × 256 × 4096 exactly
+# NAND timing — SLC flash per hbf_default.toml
+tR_ns    = 4096
+tRC_ns   = 30
+tPROG_ns = 100000
+tBERS_ns = 1000000
+enable_multi_plane_cmds = true
+max_plane_batch         = 96
+queue_depth             = 768

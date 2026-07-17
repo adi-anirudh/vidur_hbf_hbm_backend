@@ -177,3 +177,8 @@ config_optimizer_output_tmpfs
 profiler_traces*
 experiments/profiling/get_profiled_data_from_trace.ipynb
 env_3
+# FlexEP paper_eval large trace artifacts
+paper_eval/experiments/deepseek_r1_awq_trace_raw/
+paper_eval/experiments/deepseek_r1_awq_no_prune_replay/
+
+paper_eval/experiments/**/vidur_runs/

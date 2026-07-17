@@ -1,0 +1,40 @@
+{
+  "trace_root": "/home/agasthi/vidur/vidur_hbf_hbm_backend/paper_eval/experiments/deepseek_r1_awq_no_prune_replay",
+  "context_lengths": [
+    8192,
+    131072
+  ],
+  "sessions": [
+    128
+  ],
+  "microbatch_count": 2,
+  "moe_gpus": [
+    16
+  ],
+  "attention_gpus": 16,
+  "gpu_budgets": [
+    8,
+    16,
+    24,
+    32
+  ],
+  "optimize_am": false,
+  "run_points": [
+    {
+      "gpu_budget": 32,
+      "attention_gpus": 16,
+      "moe_gpus": 16
+    }
+  ],
+  "policies": [
+    "cost_dynamic"
+  ],
+  "workloads": [
+    "mixed"
+  ],
+  "decode_tokens": 128,
+  "slo_ms": 100.0,
+  "jobs": 1,
+  "no_pruning": true,
+  "simulator": "Vidur"
+}
