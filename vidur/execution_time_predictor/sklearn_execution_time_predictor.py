@@ -337,11 +337,8 @@ class SklearnExecutionTimePredictor(BaseExecutionTimePredictor):
         # convert the df to list of tuples
         df["prediction"] = model.predict(df[feature_cols])
 
-        # store the prediction data
-        df[feature_cols + [target_col, "prediction"]].to_csv(
-            f"{self._cache_dir}/{model_name}_{model_hash}_training_predictions.csv",
-            index=False,
-        )
+        # (debug CSV dump of training predictions disabled: ~100s of MB per config,
+        #  never read back -- the .pkl prediction cache is the source of truth.)
 
     def _train_model(
         self,
@@ -449,11 +446,8 @@ class SklearnExecutionTimePredictor(BaseExecutionTimePredictor):
 
         self._store_model_predication_cache(model_name, model_hash, predictions)
 
-        X["prediction"] = predictions_array
-        X.to_csv(
-            f"{self._cache_dir}/{model_name}_{model_hash}_predictions.csv",
-            index=False,
-        )
+        # (debug CSV dump of the prediction grid disabled: this X.to_csv was ~285 MB
+        #  per config and the dominant pred_cache disk hog; the .pkl above is the cache.)
 
         return predictions
 

@@ -29,7 +29,10 @@ PFX = "--h_b_f_linear_regression_execution_time_predictor_config_"
 
 
 def build_argv(args, output_dir):
-    gran = max(16, args.context_length // 2048)
+    # kv-grid resolution for the prediction table. //256 samples the (memory-bound,
+    # ~linear) decode-attention time at 256 kv points -> <0.5% interpolation error at
+    # long context but ~8x smaller cached tables than //2048 (keeps pred_cache bounded).
+    gran = max(16, args.context_length // 256)
     chunk = min(args.context_length, 4096)
     num_blocks = (args.num_kv_blocks if args.num_kv_blocks > 0 else
                   math.ceil(args.batch_size * math.ceil(args.context_length / 16) / 0.99) + 64)
@@ -82,6 +85,12 @@ def build_argv(args, output_dir):
     ]
     if args.hbf_sra:   # store_true bool flag (default False -> omit)
         argv.append(PFX + "hbf_sra")
+    if args.naive_sparse:
+        argv.append(PFX + "naive_sparse")
+    # Ablation load multipliers (default 1.0 -> no effect on Dense/SPLASH)
+    argv += [PFX + "sparse_read_amplification", str(args.sparse_read_amplification),
+             PFX + "plane_imbalance_factor",    str(args.plane_imbalance_factor),
+             PFX + "backing_bw_gbps",           str(args.backing_bw_gbps)]
     return argv
 
 
@@ -103,6 +112,17 @@ def main():
     p.add_argument("--hbf_sra", action="store_true",
                    help="HBF-SRA baseline: in-flash NMP scoring of all cold K, "
                         "then GPU sparse read.")
+    p.add_argument("--naive_sparse", action="store_true",
+                   help="Token-granular (random-position) sparse baseline: "
+                        "sequential read until the last useful block.")
+    p.add_argument("--sparse_read_amplification", type=float, default=1.0,
+                   help="Page-read amplification for token-granular retrieval "
+                        "(ablation; 1.0 = page-granular SPLASH).")
+    p.add_argument("--plane_imbalance_factor", type=float, default=1.0,
+                   help="Busiest-plane load multiplier for global (non-plane-"
+                        "balanced) top-k (ablation; 1.0 = plane-balanced SPLASH).")
+    p.add_argument("--backing_bw_gbps", type=float, default=0.0,
+                   help="Flat backing-store bandwidth GB/s (DRAM/SSD); 0 = HBF plane model.")
     p.add_argument("--num_kv_blocks", type=int, default=0)
     p.add_argument("--hbfsim_toml", default="configs/hbf_paper.toml")
     p.add_argument("--cache_dir", default="",
@@ -136,16 +156,21 @@ def main():
     with open(req_csvs[0]) as f:
         rows = list(csvmod.DictReader(f))
 
-    def pct(col, scale=1000.0):
+    def stats(col, scale=1000.0):
         vals = sorted(float(r[col]) for r in rows if r.get(col, ""))
         if not vals:
-            return None, None
+            return None
         n = len(vals)
-        return vals[n // 2] * scale, vals[min(n - 1, int(n * 0.99))] * scale
+        return dict(mean=sum(vals) / n * scale, p50=vals[n // 2] * scale,
+                    p95=vals[min(n - 1, int(n * 0.95))] * scale,
+                    p99=vals[min(n - 1, int(n * 0.99))] * scale)
 
-    tp50, tp99 = pct("decode_time_execution_plus_preemption_normalized")
-    print(f"RESULT status=OK tpot_p50_ms={tp50} tpot_p99_ms={tp99} "
-          f"n_requests={len(rows)}")
+    s = stats("decode_time_execution_plus_preemption_normalized")
+    if s is None:
+        print("RESULT status=FAIL reason=no_decode")
+        return
+    print(f"RESULT status=OK tpot_p50_ms={s['p50']} tpot_p99_ms={s['p99']} "
+          f"tpot_mean_ms={s['mean']} tpot_p95_ms={s['p95']} n_requests={len(rows)}")
 
     # tidy temp dirs so a large sweep doesn't fill /tmp
     import shutil

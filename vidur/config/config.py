@@ -569,7 +569,7 @@ class BaseExecutionTimePredictorConfig(BasePolyConfig):
         metadata={"help": "NCCL CPU skew overhead per device in ms."},
     )
     num_training_job_threads: int = field(
-        default=-1,
+        default=1,
         metadata={"help": "Number of training job threads."},
     )
     skip_cpu_overhead_modeling: bool = field(
@@ -685,6 +685,49 @@ class HBFLinearRegressionExecutionTimePredictorConfig(
     nmp_flops_per_byte: float = field(
         default=2.0,
         metadata={"help": "NMP compute budget (FLOPS per byte) for HBF-SRA scoring."},
+    )
+    sparse_read_amplification: float = field(
+        default=1.0,
+        metadata={
+            "help": (
+                "Page-read amplification for TOKEN-GRANULAR sparse retrieval "
+                "(ablation baseline). SPLASH selects at page (block) granularity so "
+                "each selected unit is one page read (factor 1.0). Token-granular "
+                "selection reads the top-k TOKENS, which scatter across pages, so the "
+                "number of distinct pages touched inflates by this factor. For a "
+                "page of B tokens and sparsity s, uniform-random positions give "
+                "(1-(1-s)^B)/s (~8x at s=0.1, B=16); query-correlated (clustered) "
+                "selection gives ~4x. Scales the per-plane sparse load; default 1.0 "
+                "leaves page-granular SPLASH/Dense unchanged."
+            )
+        },
+    )
+    plane_imbalance_factor: float = field(
+        default=1.0,
+        metadata={
+            "help": (
+                "Busiest-plane load multiplier for GLOBAL (non-plane-balanced) top-k "
+                "selection (ablation baseline). SPLASH's plane-balanced selection "
+                "reads exactly the average per-plane page count on every plane, so the "
+                "round count is set by the average (factor 1.0). Global top-k lets the "
+                "per-plane count vary; the busiest plane -- which sets the serial round "
+                "count -- exceeds the average by this factor (~2x for query-correlated "
+                "selection). Scales the per-plane sparse load; default 1.0 leaves "
+                "plane-balanced SPLASH/Dense unchanged."
+            )
+        },
+    )
+
+    backing_bw_gbps: float = field(
+        default=0.0,
+        metadata={
+            "help": (
+                "Flat read bandwidth (GB/s) of a commodity KV backing store "
+                "(CPU DRAM over PCIe, SSD) for the spilled cold KV, used INSTEAD of "
+                "the NAND plane model. 0 = use the HBF plane model (default). Motivation "
+                "figure: DRAM~64, SSD~7; HBF uses the plane model (0)."
+            )
+        },
     )
 
     @staticmethod

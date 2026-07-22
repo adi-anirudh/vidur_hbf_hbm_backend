@@ -417,24 +417,50 @@ class HBFLinearRegressionExecutionTimePredictor(LinearRegressionExecutionTimePre
             # HBF time: sparse on cold portion, all layers staged simultaneously.
             # SRA reads V only (KV/2) since the NMP did QK^T near-memory; non-SRA
             # reads the full KV block.
+            backing_bw = getattr(self._config, "backing_bw_gbps", 0.0)
+            amp = getattr(self._config, "sparse_read_amplification", 1.0)
             if hbf_blocks > 0 and sparsity > 0:
                 total_hbf_blocks = hbf_blocks * num_layers
-                dense_pp  = math.ceil(total_hbf_blocks / total_planes)
-                sparse_pp = max(1, math.ceil(dense_pp * sparsity))
-                if sra:
-                    a_bytes = self._hbf_sra_scores_bytes(sparse_pp * total_planes)
-                    flash_time_ms = self._plane_sparse_read_ms(
-                        sparse_pp, self._kv_block_bytes / 2.0, extra_bus_bytes=a_bytes)
+                if backing_bw > 0.0:
+                    # Flat device-BW model (e.g. 8 TB/s Blackwell HBF): every baseline
+                    # reads at the SAME aggregate bandwidth, so only the ACCESS PATTERN
+                    # differs -- not the BW. (The 768-plane NAND model below is a 768
+                    # GB/s device; do NOT mix it with an 8 TB/s flat baseline.)
+                    half = self._kv_block_bytes / 2.0     # K (or V) = half a KV block
+                    if sra:
+                        # Naive token-granular sparse = SPLASH minus its two co-design
+                        # wins. K and V are stored/read separately, so:
+                        #  (1) scoring: no centroid -> an in-flash NMP SCORES ALL cold K
+                        #      (token-granular, every key = half a block). This runs
+                        #      near-memory IN PARALLEL with the GPU reading the hot HBM
+                        #      sliding window -> max(hbm_window, scan_all_K).
+                        #  (2) read amplification: the token-granular selected-V read is
+                        #      scattered -> inflated to min(1, sparsity*amp) of the cold V,
+                        #      added on top.
+                        t_scan_ms = total_hbf_blocks * half / (backing_bw * 1e6)
+                        t_read_ms = (total_hbf_blocks * min(1.0, sparsity * amp) * half
+                                     / (backing_bw * 1e6))
+                        return (max(hbm_time_ms, t_scan_ms) + t_read_ms) / num_layers
+                    # SPLASH / Dense: centroid selection (scoring ~free), page-granular
+                    # read of the sparse fraction of the full KV block (K+V).
+                    flash_bytes = total_hbf_blocks * sparsity * self._kv_block_bytes
+                    flash_time_ms = flash_bytes / (backing_bw * 1e6)
                 else:
-                    flash_time_ms = self._plane_sparse_read_ms(
-                        sparse_pp, self._kv_block_bytes)
+                    dense_pp  = math.ceil(total_hbf_blocks / total_planes)
+                    sparse_pp = max(1, math.ceil(dense_pp * sparsity))
+                    if sra:
+                        a_bytes = self._hbf_sra_scores_bytes(sparse_pp * total_planes)
+                        flash_time_ms = self._plane_sparse_read_ms(
+                            sparse_pp, self._kv_block_bytes / 2.0, extra_bus_bytes=a_bytes)
+                    else:
+                        flash_time_ms = self._plane_sparse_read_ms(
+                            sparse_pp, self._kv_block_bytes)
             else:
                 flash_time_ms = 0.0
 
             if sra:
-                # HBF-SRA: NMP scores ALL cold K in-flash while the GPU reads the
-                # hot HBM window (overlap), THEN the GPU reads sparse V + scores A:
-                #   T = max(T_hbm, T_score) + T_send(A + sparse_V)
+                # Plane-model SRA (backing_bw == 0): NMP scores ALL cold K in-flash
+                # overlapped with the hot HBM read, then the GPU reads sparse V.
                 t_score_ms = self._hbf_sra_score_ms(max(0, hbf_blocks) * num_layers)
                 return (max(hbm_time_ms, t_score_ms) + flash_time_ms) / num_layers
 
@@ -477,22 +503,45 @@ class HBFLinearRegressionExecutionTimePredictor(LinearRegressionExecutionTimePre
                 blocks_per_plane_sparse = max(
                     1, math.ceil(total_selected_blocks / total_planes))
 
+            # Ablation load multipliers: token-granular page-read amplification and
+            # global-topk plane imbalance both inflate the pages read per plane (the
+            # busiest plane sets the serial flash-round count). Applied to the READ
+            # only (not to the scored-block count), capped at the dense per-plane
+            # count. Defaults are 1.0 (SPLASH's page-granular, plane-balanced read).
+            load_factor = (self._config.sparse_read_amplification
+                           * self._config.plane_imbalance_factor)
+            bpp_read = blocks_per_plane_sparse
+            if load_factor > 1.0:
+                bpp_read = min(blocks_per_plane_dense,
+                               max(1, math.ceil(blocks_per_plane_sparse * load_factor)))
+
             sra = getattr(self._config, "hbf_sra", False)
             if sra:
-                # HBF-SRA: NMP scored ALL cold K near-memory (QK^T done in the HBF),
-                # so the GPU does only the AV GEMV: it reads sparse V (KV/2) from the
-                # planes and receives the scores A from the NMP over the same bus.
-                #   T = max(T_hbm, T_score) + T_send(A + sparse_V);  T_hbm = 0 here.
+                # Full-key scoring (HBF-SRA / token-granular): the NMP scores ALL cold
+                # K near-memory (QK^T in HBF) -- this is the ONLY way to score at token
+                # granularity, so token-granular pays the same full-K scan as full-page
+                # scoring. The GPU then does the AV GEMV: it reads sparse V (KV/2) from
+                # the planes (amplified by load_factor for token-granular) and receives
+                # the scores A over the same bus.  T = T_score + T_send(A + sparse_V).
                 a_bytes = self._hbf_sra_scores_bytes(total_selected_blocks)
                 flash_sparse_ms = self._plane_sparse_read_ms(
-                    blocks_per_plane_sparse, self._kv_block_bytes / 2.0,
-                    extra_bus_bytes=a_bytes)
+                    bpp_read, self._kv_block_bytes / 2.0, extra_bus_bytes=a_bytes)
                 t_score_ms = self._hbf_sra_score_ms(total_dense_blocks)
                 return (t_score_ms + flash_sparse_ms) / num_layers
 
-            # Dense/Sparse: GPU reads the full KV block (K+V) and does both GEMVs.
-            flash_sparse_ms = self._plane_sparse_read_ms(
-                blocks_per_plane_sparse, self._kv_block_bytes)
+            # Aggregate-bandwidth HBF model (backing_bw_gbps > 0): read the selected
+            # KV at a flat peak bandwidth instead of the 768-plane NAND model. This is
+            # the plane model at saturation (aggregate BW = total_planes x page/tR), and
+            # is how we set an exact device bandwidth (e.g., 8 TB/s Blackwell-class HBF).
+            backing_bw = getattr(self._config, "backing_bw_gbps", 0.0)
+            if backing_bw > 0.0:
+                read_blocks = min(total_dense_blocks, bpp_read * total_planes)
+                flash_ms = read_blocks * self._kv_block_bytes / (backing_bw * 1e6)
+                return flash_ms / num_layers
+
+            # Dense/Sparse/plane-imbalance: GPU reads the full KV block (K+V) and does
+            # both GEMVs; scoring is the cheap metadata scan (hidden, not modeled here).
+            flash_sparse_ms = self._plane_sparse_read_ms(bpp_read, self._kv_block_bytes)
             return flash_sparse_ms / num_layers
 
     # ──────────────────────────────────────────────────────────────────────

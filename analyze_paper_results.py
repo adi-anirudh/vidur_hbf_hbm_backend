@@ -20,8 +20,8 @@ from collections import defaultdict
 # ---------------------------------------------------------------------------
 # Physical constants
 # ---------------------------------------------------------------------------
-HBM_PJ_PER_BIT  = 2.7    # pJ/bit (FlashAccel reference)
-HBF_PJ_PER_BIT  = 8.0    # pJ/bit (NAND flash, H³ reference)
+HBM_PJ_PER_BIT  = 2.99   # pJ/bit, HBM3e (characterization ref [4])
+HBF_PJ_PER_BIT  = 8.0    # pJ/bit, hybrid-bonded Flash prototype (char. ref [62]); 2.7x HBM3e
 BLOCK_SIZE       = 16     # tokens per KV block (Vidur default)
 SPARSITY         = 0.10   # Sparse top-K fraction
 
@@ -35,6 +35,7 @@ GPU_COMPUTE_PJ_PER_FLOP = {
     "h100": 700e12 / (2000e12 * 0.5),  # ~0.7 pJ/FLOP
     "a40":  300e12 / (150e12 * 0.5),   # ~4.0 pJ/FLOP
     "h200": 1000e12 / (4000e12 * 0.5), # ~0.5 pJ/FLOP
+    "blackwell": 1000e12 / (2250e12 * 0.5), # B200 ~1000W / 2.25 PFLOPS FP16 dense -> ~0.89 pJ/FLOP
 }
 
 MODEL_INFO = {

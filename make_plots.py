@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""ACM camera-ready plots from results/full_sweep.csv (Blackwell, H3 vs SPaKV).
+"""ACM camera-ready plots from results/full_sweep_tp.csv (Blackwell, H3 vs SPLASH).
 
 Styled to match the FlashAccel paper: serif fonts, compact column widths,
 grouped bars (Fig-13 style), vector PDF + 300-dpi PNG for LaTeX.
 
-  1. Throughput improvement (SPaKV / H3) vs context — all models, one plot
-  2. TPOT latency p50 / p99 vs context — H3 vs SPaKV
+  1. Throughput improvement (SPLASH / H3) vs context — all models, one plot
+  2. TPOT latency p50 / p99 vs context — H3 vs SPLASH
   3. Sustainable throughput/GPU under TPOT SLO (50 / 100 ms) — grouped bars
-  4. Geomean SPaKV speedup per model
+  4. Geomean SPLASH speedup per model
 """
 import csv, math, os
 import numpy as np
@@ -15,9 +15,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-CSV, OUT = "results/full_sweep.csv", "results/plots"
+CSV, OUT = "results/full_sweep_tp.csv", "results/plots"
 os.makedirs(OUT, exist_ok=True)
-DISP = {"Dense": "H3", "Sparse": "SPaKV"}
+DISP = {"Dense": "H3", "Sparse": "SPLASH"}
 C_H3, C_SP = "#c44e52", "#4c72b0"          # muted ACM-ish red / blue
 
 # ── ACM camera-ready style ──────────────────────────────────────────────────
@@ -39,9 +39,9 @@ def save(fig, name):
         fig.savefig(f"{OUT}/{name}.{ext}")
     plt.close(fig)
 
-rows = [r for r in csv.DictReader(open(CSV)) if r["status"] == "OK"]
+rows = [r for r in csv.DictReader(open(CSV)) if r["status"] == "OK" and int(r["tp"]) == 8]
 tpot, tp = {}, {}
-for r in rows:
+for r in rows:                           # fixed TP=8: consistent 8-GPU-node comparison
     k = (r["model"], int(r["batch"]), int(r["context_length"]), r["baseline"])
     tpot[k] = float(r["tpot_p50_ms"]); tp[k] = int(r["tp"])
 models   = sorted({r["model"] for r in rows})
@@ -72,18 +72,18 @@ ax.text(contexts[0], 10.3, r"$1/s=10\times$ (flash-bound limit)", fontsize=7, co
 ax.set_xscale("log", base=2)
 ax.set_xticks(contexts); ax.set_xticklabels([ctx_label(c) for c in contexts])
 ax.set_xlabel("Context length (tokens)")
-ax.set_ylabel(r"Throughput gain (SPaKV / H3)")
+ax.set_ylabel(r"Throughput gain (SPLASH / H3)")
 ax.legend(fontsize=6.5, ncol=4, loc="upper left", handletextpad=0.4)
 ax.set_ylim(0.9, 11.5); ax.grid(True)
 save(fig, "1_throughput_improvement")
 
-# ── 2. Per-model TPOT p50 and p99 — H3 vs SPaKV (two plots, same style) ─────
+# ── 2. Per-model TPOT p50 and p99 — H3 vs SPLASH (two plots, same style) ─────
 # Per model, the percentile is taken over that model's feasible (batch x context)
 # configs: p50 = typical operating point, p99 = heaviest (large batch, long ctx).
 def pct(m, base, q):
     v = [tpot[k] for k in tpot if k[0] == m and k[3] == base]
     return np.percentile(v, q) if v else 0.0
-order2 = sorted(models, key=lambda m: pct(m, "Sparse", 50))   # shared order, by SPaKV p50
+order2 = sorted(models, key=lambda m: pct(m, "Sparse", 50))   # shared order, by SPLASH p50
 def latency_bar(q, fname):
     y = np.arange(len(order2)); h = 0.38
     fig, ax = plt.subplots(figsize=(5.2, 4.4))
@@ -100,14 +100,13 @@ def latency_bar(q, fname):
     ax.set_yticks(y); ax.set_yticklabels([short(m) for m in order2], fontsize=6.5)
     ax.set_xlim(0, xm*1.14)
     ax.set_xlabel(f"TPOT p{q} latency (ms)")
-    ax.set_title(f"Per-model decode latency — TPOT p{q}  (H3 vs SPaKV)")
     ax.grid(True, axis="x"); ax.legend(loc="lower right")
     save(fig, fname)
 latency_bar(50, "2a_tpot_p50")
-latency_bar(99, "2b_tpot_p99")
+latency_bar(95, "2b_tpot_p95")
 
 # ── 3. Sustainable throughput/GPU under SLO at a fixed context (horiz bars) ──
-# Fixed context so H3 and SPaKV are computed at the SAME point (comparable);
+# Fixed context so H3 and SPLASH are computed at the SAME point (comparable);
 # throughput/GPU = (max batch meeting SLO) / TPOT / TP. A system that can't meet
 # the SLO at any batch is marked "x SLO not met" rather than a blank bar.
 CTX_FIX = 65536
@@ -122,7 +121,7 @@ for ax, slo in zip(axes, (50, 100)):
     h3  = [thru_per_gpu(m,"Dense", slo) for m in order3]
     spk = [thru_per_gpu(m,"Sparse",slo) for m in order3]
     ax.barh(y+h/2, h3,  h, color=C_H3, edgecolor="k", lw=0.4, hatch="///", label="H3")
-    ax.barh(y-h/2, spk, h, color=C_SP, edgecolor="k", lw=0.4, label="SPaKV")
+    ax.barh(y-h/2, spk, h, color=C_SP, edgecolor="k", lw=0.4, label="SPLASH")
     xmax = max(spk + [1])
     for j, (vh, vs) in enumerate(zip(h3, spk)):
         if vh == 0: ax.text(xmax*0.012, y[j]+h/2, "SLO not met", va="center", fontsize=5.3, color=C_H3, style="italic")
@@ -140,7 +139,7 @@ save(fig, "3_throughput_under_slo")
 
 # ── 4. Throughput gain under 100 ms SLO vs context (per model) ──────────────
 # Max sustainable throughput/GPU under the SLO = (best batch meeting SLO)/TPOT/TP.
-# gain = SPaKV/H3 at each context. We EXCLUDE points where H3 only meets the SLO
+# gain = SPLASH/H3 at each context. We EXCLUDE points where H3 only meets the SLO
 # at batch=1 (weight-bound strawman -> explosive ratios); those models are listed
 # as H3-can't-sustainably-serve. Clean curves climb toward the 1/s = 10x ceiling.
 SLO4 = 100
@@ -163,13 +162,13 @@ g = math.exp(np.mean(np.log(allg)))
 ax.set_xscale("log", base=2); ax.set_xticks(ctx4); ax.set_xticklabels([ctx_label(c) for c in ctx4])
 ax.set_ylim(0, max(allg)*1.08)
 ax.set_xlabel("Context length (tokens)")
-ax.set_ylabel("Throughput gain under 100 ms SLO\n(SPaKV / H3)")
+ax.set_ylabel("Throughput gain under 100 ms SLO\n(SPLASH / H3)")
 ax.set_title(f"Decode throughput gain under 100 ms SLO   (geomean {g:.1f}×)")
 ax.grid(True)
 ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=6.5, ncol=1, borderaxespad=0.)
 save(fig, "4_throughput_gain_slo")
 
-# ── 5. SLO feasibility scatter: ours (SPaKV) vs dense (H3) TPOT ─────────────
+# ── 5. SLO feasibility scatter: ours (SPLASH) vs dense (H3) TPOT ─────────────
 from matplotlib.colors import LogNorm
 from matplotlib.patches import Rectangle
 def slo_scatter(slo, fname):
@@ -194,8 +193,7 @@ def slo_scatter(slo, fname):
                     s=16, alpha=0.8, edgecolor="none", zorder=3)
     ax.set_xscale("log"); ax.set_yscale("log"); ax.set_xlim(lo, hi); ax.set_ylim(lo, hi)
     ax.set_aspect("equal")
-    ax.set_xlabel("H3 (dense) TPOT p50 (ms)"); ax.set_ylabel("SPaKV (ours) TPOT p50 (ms)")
-    ax.set_title(f"All {len(xs)} configs vs the {slo} ms TPOT SLO  (Blackwell)")
+    ax.set_xlabel("H3 (dense) TPOT p50 (ms)"); ax.set_ylabel("SPLASH (ours) TPOT p50 (ms)")
     bb = dict(boxstyle="round,pad=0.3", fc="white", ec="0.7", lw=0.5)
     ax.text(0.03, 0.04, f"Both meet SLO\nn={both}", transform=ax.transAxes, fontsize=7, va="bottom", bbox=bb)
     ax.text(0.97, 0.97, f"Neither\nn={neither}", transform=ax.transAxes, fontsize=7, ha="right", va="top", bbox=bb)
@@ -208,6 +206,21 @@ def slo_scatter(slo, fname):
     return both, neither, ours, dense
 s50 = slo_scatter(50, "5_slo_scatter_50ms")
 s100 = slo_scatter(100, "5b_slo_scatter_100ms")
+
+# ── 6. TPOT vs batch at fixed context ───────────────────────────────────────
+CTX6, BASE6 = 32768, "Sparse"
+fig, ax = plt.subplots(figsize=(7.0, 3.4))
+for i, (m, col) in enumerate(zip(models, colors)):
+    xs = [b for b in batches if (m, b, CTX6, BASE6) in tpot]
+    ys = [tpot[(m, b, CTX6, BASE6)] for b in xs]
+    if xs:
+        ax.plot(xs, ys, marker=markers[i%len(markers)], color=col, lw=1.2, ms=3.4, label=short(m))
+ax.set_xscale("log", base=2); ax.set_xticks(batches); ax.set_xticklabels(batches)
+ax.set_xlabel("Batch size"); ax.set_ylabel("TPOT (ms)")
+ax.set_title(f"TPOT vs batch  (context = {ctx_label(CTX6)}, SPLASH, Blackwell)")
+ax.grid(True, which="both")
+ax.legend(loc="upper left", bbox_to_anchor=(1.01, 1.0), fontsize=6.5, ncol=1, borderaxespad=0.)
+save(fig, "6_tpot_vs_batch")
 
 print("wrote plots (png+pdf) to", OUT,
       f"| throughput gain @100ms geomean={g:.1f}x max={max(allg):.1f}x (ctx<=256K)")

@@ -1,0 +1,4 @@
+RESULT H3 {"kv_read": 80.5318656, "attn_proj": 5.139003198857122, "mlp": 2.4876255679262127, "kv_write": 0.025186, "prefill": 0.0, "comm": 8.271979589189236, "norms": 7.128824838231843, "pp_comm": 0.0, "model_time_ms": 103.58448479420443, "total_time_ms": 103.58448479420443, "block_total": 103.58448479420443}
+RESULT Naive {"kv_read": 41.076480206438404, "attn_proj": 5.139003198857122, "mlp": 2.4876255679262127, "kv_write": 0.025186, "prefill": 0.0, "comm": 8.271979589189236, "norms": 7.128824838231843, "pp_comm": 0.0, "model_time_ms": 64.12909940064281, "total_time_ms": 64.12909940064281, "block_total": 64.12909940064281}
+RESULT SPLASH {"kv_read": 26.020036607999998, "attn_proj": 5.139003198857122, "mlp": 2.4876255679262127, "kv_write": 0.025186, "prefill": 0.0, "comm": 8.271979589189236, "norms": 7.128824838231843, "pp_comm": 0.0, "model_time_ms": 49.07265580220441, "total_time_ms": 49.07265580220441, "block_total": 49.07265580220441}
+BREAKDOWN CAPTURE DONE
