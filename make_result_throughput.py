@@ -12,7 +12,8 @@ import matplotlib as mpl; mpl.use("Agg")
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
-ROWS = [r for r in csv.DictReader(open("results/sweep_b200.csv")) if r["status"] == "OK"]
+ROWS = [r for r in csv.DictReader(open("results/sweep_b200_weight_valid.csv"))
+        if r["status"] == "OK"]
 MODELS = [("meta-llama/Meta-Llama-3-8B", "Llama-3-8B"),
           ("mistralai/Mixtral-8x7B-v0.1", "Mixtral-8×7B"), ("deepseek-ai/deepseek-llm-67b-chat", "DeepSeek-67B"),
           ("meta-llama/Meta-Llama-3-70B", "Llama-3-70B"), ("Qwen/Qwen3-235B-A22B", "Qwen3-235B")]
@@ -107,5 +108,54 @@ def render(work, slo, fname):
     print(f"wrote {fname} (SLO={slo}, {len(work)} workloads)")
 
 
+def render_singlecol(fname):
+    """Single-column (IEEE 3.4in) combined goodput: 5 model panels stacked, all 8
+    contexts; short contexts use the 50 ms SLO, long contexts the 100 ms SLO."""
+    short = compute(50, [131072, 196608, 262144, 393216])
+    lng = compute(100, [524288, 786432, 1048576, 2097152])
+    ctxs8 = ["128K", "192K", "256K", "384K", "512K", "768K", "1M", "2M"]
+    centers = np.arange(8)
+    bw = 0.2
+    fig, axes = plt.subplots(len(MODELS), 1, figsize=(3.4, 6.15),
+                             sharex=True, sharey=True)
+    for ax, (mk, md) in zip(axes, MODELS):
+        work = [w for w in short if w["model"] == md] + \
+               [w for w in lng if w["model"] == md]
+        for i, (_, s) in enumerate(SYS):
+            xs = centers + (i - 1.5) * bw
+            ys = [(w["vals"][s] if w["vals"][s] is not None else 0.0) for w in work]
+            ax.bar(xs, ys, bw, color=COL[s], edgecolor=EDGE[s], linewidth=0.4,
+                   hatch=HATCH.get(s), zorder=3, label=DISP[s])
+            for w, xx in zip(work, xs):
+                if w["vals"][s] is None:
+                    ax.plot(xx, 0.05, marker="x", color="#d21f1f", ms=3, mew=1.0, zorder=6)
+        ax.set_ylim(0, 1.18); ax.set_yticks([0, 0.5, 1.0])
+        ax.grid(True, axis="y", ls=(0, (4, 3)), lw=0.4, color="#cfcfcf", zorder=0)
+        ax.set_axisbelow(True)
+        ax.axvline(3.5, color="#9a9a9a", lw=0.7, ls=(0, (3, 2)), zorder=1)
+        ax.set_xlim(-0.6, 7.6)
+        for sp in ("top", "right"): ax.spines[sp].set_visible(False)
+        ax.text(0.012, 0.9, md, transform=ax.transAxes, ha="left", va="top",
+                fontsize=6.6, fontweight="bold")
+        ax.tick_params(labelsize=5.8)
+    axes[-1].set_xticks(centers)
+    axes[-1].set_xticklabels(ctxs8, rotation=45, fontsize=5.8)
+    axes[0].text(1.5, 1.24, "SLO 50 ms", ha="center", va="bottom", fontsize=6.2,
+                 style="italic", color="#555", clip_on=False)
+    axes[0].text(5.5, 1.24, "SLO 100 ms", ha="center", va="bottom", fontsize=6.2,
+                 style="italic", color="#555", clip_on=False)
+    fig.supylabel("Normalized Goodput", fontsize=7.0, x=0.02)
+    h, l = axes[0].get_legend_handles_labels()
+    fig.legend(h, l, loc="upper center", bbox_to_anchor=(0.5, 1.004), ncol=4,
+               frameon=False, fontsize=6.2, handlelength=1.1, handletextpad=0.4,
+               columnspacing=1.1)
+    fig.subplots_adjust(left=0.135, right=0.985, top=0.925, bottom=0.055, hspace=0.32)
+    for e in ("png", "pdf"):
+        fig.savefig(f"results/plots/{fname}.{e}")
+    plt.close(fig)
+    print(f"wrote {fname} (single-column, 5 models x 8 contexts)")
+
+
 render(compute(50, [131072, 196608, 262144, 393216]), 50, "result_goodput_slo50")
 render(compute(100, [524288, 786432, 1048576, 2097152]), 100, "result_goodput_slo100")
+render_singlecol("result_goodput_singlecol")
