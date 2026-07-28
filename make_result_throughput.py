@@ -111,29 +111,12 @@ render(compute(50, [131072, 196608, 262144, 393216]), 50, "result_goodput_slo50"
 render(compute(100, [524288, 786432, 1048576, 2097152]), 100, "result_goodput_slo100")
 
 
-def _abs_goodput(slo, ctxs):
-    """Best per-GPU goodput (tok/s) per (model, ctx, baseline) under the SLO."""
-    from collections import defaultdict
-    b = defaultdict(lambda: None)
-    for r in ROWS:
-        t = float(r["tpot_p50_ms"])
-        if t > slo:
-            continue
-        thr = int(r["batch"]) * 1000.0 / t / int(r["tp"])
-        k = (r["model"], int(r["context_length"]), r["baseline"])
-        if b[k] is None or thr > b[k]:
-            b[k] = thr
-    return b
-
 
 def render_combined(fname):
-    """Two panels, SLO 50 ms (top) + SLO 100 ms (bottom). Absolute per-GPU goodput
-    on a LOG y-axis (keeps SPLASH bars, which vary rather than pinning at 1.0). All
-    four systems; x marks an SLO-infeasible point."""
-    short_ctx = [131072, 196608, 262144, 393216]
-    long_ctx = [524288, 786432, 1048576, 2097152]
-    panels = [(_abs_goodput(50, short_ctx), short_ctx, 50),
-              (_abs_goodput(100, long_ctx), long_ctx, 100)]
+    """Two short panels (SLO 50 ms / SLO 100 ms). Normalized goodput (relative to
+    SPLASH = 1). Nexus-style short single-column banner."""
+    panels = [(compute(50, [131072, 196608, 262144, 393216]), 50),
+              (compute(100, [524288, 786432, 1048576, 2097152]), 100)]
     NCc = 4
     cen = []; x = 0.0
     for m in range(len(MODELS)):
@@ -141,52 +124,44 @@ def render_combined(fname):
             cen.append(x); x += 1.0
         x += 1.15
     cen = np.array(cen)
-    ymax = max(v for bd, _, _ in panels for v in bd.values() if v is not None)
-    fig, axes = plt.subplots(2, 1, figsize=(3.4, 2.7))
-    for ax, (bd, ctxs, slo) in zip(axes, panels):
+    bw = 0.205
+    fig, axes = plt.subplots(2, 1, figsize=(3.4, 1.9))
+    for ax, (work, slo) in zip(axes, panels):
         for i, (sk, sd) in enumerate(SYS):
-            xs = cen + (i - 1.5) * bw_g()
-            gi = 0
-            for mk, _ in MODELS:
-                for c in ctxs:
-                    v = bd[(mk, c, sk)]; xx = xs[gi]; gi += 1
-                    if v is None:
-                        ax.plot(xx, 1.4, marker="x", color="#d21f1f", ms=2.3, mew=0.8, zorder=6)
-                    else:
-                        ax.bar(xx, v, bw_g(), color=COL[sd], edgecolor=EDGE[sd],
-                               linewidth=0.4, hatch=HATCH.get(sd), zorder=3)
-        ax.set_yscale("log")
-        ax.set_ylim(1, ymax * 1.6); ax.set_yticks([1, 10, 100, 1000])
-        ax.tick_params(labelsize=6.5)
-        ax.set_ylabel("Goodput\n(tok/s/GPU)", fontsize=7.0, linespacing=0.9)
-        ax.grid(True, axis="y", which="major", ls=(0, (4, 3)), lw=0.4, color="#cfcfcf", zorder=0)
+            xs = cen + (i - 1.5) * bw
+            for w, xx in zip(work, xs):
+                v = w["vals"][sd]
+                if v is None:
+                    ax.plot(xx, 0.05, marker="x", color="#d21f1f", ms=2.2, mew=0.8, zorder=6)
+                else:
+                    ax.bar(xx, v, bw, color=COL[sd], edgecolor=EDGE[sd], linewidth=0.4,
+                           hatch=HATCH.get(sd), zorder=3)
+        ax.set_ylim(0, 1.12); ax.set_yticks([0, 0.5, 1.0]); ax.tick_params(labelsize=6.5)
+        ax.set_ylabel("Goodput\n/ SPLASH", fontsize=7.0, linespacing=0.9)
+        ax.grid(True, axis="y", ls=(0, (4, 3)), lw=0.4, color="#cfcfcf", zorder=0)
         ax.set_axisbelow(True); ax.set_xlim(cen[0] - 0.65, cen[-1] + 0.65)
         for sp in ("top", "right"): ax.spines[sp].set_visible(False)
         for m in range(1, len(MODELS)):
             ax.axvline((cen[m * NCc - 1] + cen[m * NCc]) / 2, color="#dddddd", lw=0.5, zorder=1)
         ax.set_xticks(cen)
-        ax.set_xticklabels([CTXLAB[c] for _ in MODELS for c in ctxs], fontsize=5.6, rotation=90)
+        ax.set_xticklabels([w["ctx"] for w in work], fontsize=5.6, rotation=90)
         ax.tick_params(axis="x", pad=1.0)
-        ax.text(0.01, 0.96, f"SLO {slo} ms", transform=ax.transAxes, fontsize=6.5,
+        ax.text(0.01, 0.93, f"SLO {slo} ms", transform=ax.transAxes, fontsize=6.5,
                 style="italic", color="#555", ha="left", va="top")
     for m, (_, name) in enumerate(MODELS):
         xc = (cen[m * NCc] + cen[m * NCc + NCc - 1]) / 2
-        axes[1].text(xc, -0.72, name, ha="center", va="top", fontsize=6.8,
+        axes[1].text(xc, -0.95, name, ha="center", va="top", fontsize=6.8,
                      transform=axes[1].get_xaxis_transform())
     handles = [plt.Rectangle((0, 0), 1, 1, fc=COL[sd], ec=EDGE[sd], lw=0.4,
                              hatch=HATCH.get(sd)) for _, sd in SYS]
     fig.legend(handles, [DISP[sd] for _, sd in SYS], loc="upper center",
-               bbox_to_anchor=(0.5, 1.02), ncol=4, frameon=False, fontsize=6.2,
+               bbox_to_anchor=(0.5, 1.05), ncol=4, frameon=False, fontsize=6.2,
                handlelength=0.9, handletextpad=0.3, columnspacing=0.7)
-    fig.subplots_adjust(left=0.155, right=0.99, top=0.9, bottom=0.2, hspace=0.5)
+    fig.subplots_adjust(left=0.15, right=0.99, top=0.88, bottom=0.22, hspace=0.62)
     for e in ("png", "pdf"):
         fig.savefig(f"results/plots/{fname}.{e}", bbox_inches="tight")
     plt.close(fig)
     print("wrote", fname)
-
-
-def bw_g():
-    return 0.205
 
 
 render_combined("result_goodput_combined")

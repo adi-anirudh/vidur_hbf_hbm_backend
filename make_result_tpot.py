@@ -148,7 +148,7 @@ def render_combined(fname):
             cen.append(x); x += 1.0
         x += 1.15
     cen = np.array(cen)
-    fig, axes = plt.subplots(2, 1, figsize=(3.4, 2.7))
+    fig, axes = plt.subplots(2, 1, figsize=(3.4, 1.9))
     for ax, (work, ctxs, slo) in zip(axes, panels):
         for i, (sk, _) in enumerate(SYS):
             xs = cen + (i - 1) * bw
@@ -176,7 +176,7 @@ def render_combined(fname):
                 style="italic", color="#555", ha="left", va="top")
     for m, (_, name) in enumerate(MODELS):
         xc = (cen[m * NCloc] + cen[m * NCloc + NCloc - 1]) / 2
-        axes[1].text(xc, -0.72, name, ha="center", va="top", fontsize=6.8,
+        axes[1].text(xc, -0.95, name, ha="center", va="top", fontsize=6.8,
                      transform=axes[1].get_xaxis_transform())
     handles = [plt.Rectangle((0, 0), 1, 1, fc=COL[s], ec=EDGE[s], lw=0.4,
                              hatch=HATCH.get(s)) for s, _ in SYS]
@@ -184,7 +184,7 @@ def render_combined(fname):
     fig.legend(handles, [d for _, d in SYS] + ["SLO"], loc="upper center",
                bbox_to_anchor=(0.5, 1.02), ncol=4, frameon=False, fontsize=6.2,
                handlelength=0.9, handletextpad=0.3, columnspacing=0.8)
-    fig.subplots_adjust(left=0.14, right=0.99, top=0.9, bottom=0.2, hspace=0.5)
+    fig.subplots_adjust(left=0.14, right=0.99, top=0.88, bottom=0.22, hspace=0.62)
     for e in ("png", "pdf"):
         fig.savefig(f"results/plots/{fname}.{e}", bbox_inches="tight")
     plt.close(fig)
