@@ -154,10 +154,10 @@ def run_ours_caseC() -> dict:
 # ---------------------------------------------------------------------------
 
 # Workload: 6000 KV blocks × 256 KB = 1536 MB total
-# All three configs share the same total bandwidth = 768 GB/s = 768 bytes/ns.
-# Expected decode time ≈ 1536 MB / 768 GB/s ≈ 2.097 ms (same for all configs).
+# All three configs share the same total bandwidth = 1024 GB/s = 1024 bytes/ns.
+# Expected decode time ≈ 1536 MB / 1024 GB/s ≈ 1.573 ms (same for all configs).
 TOTAL_KV_BYTES_D  = 6144 * 256 * 1024   # 1536 MB (divisible by 64×8MB for clean convergence)
-TOTAL_BW_BYTES_NS = 768.0               # 768 GB/s = 768 bytes/ns
+TOTAL_BW_BYTES_NS = 1024.0              # 1024 GB/s = 1024 bytes/ns
 
 
 def _make_scheduler_flat(n_planes: int, page_size_bytes: int, tR_ns: float) -> PlaneScheduler:
@@ -482,7 +482,7 @@ def main():
     our_A  = run_ours_caseA()
     our_B  = run_ours_caseB()
     our_C  = run_ours_caseC()
-    our_D1 = run_ours_caseD_config(n_planes=768,  page_size_bytes=4_096)           # current default
+    our_D1 = run_ours_caseD_config(n_planes=1024, page_size_bytes=4_096)           # current default
     our_D2 = run_ours_caseD_config(n_planes=64,   page_size_bytes=8*1024*1024)     # HBFSim-like block
     our_D3 = run_ours_caseD_config(n_planes=1024, page_size_bytes=16_384)          # HBFSim exact geom
 
@@ -566,7 +566,7 @@ def main():
     print(f"  (Convergence holds when kv_per_plane ≫ page_size; ceiling quantisation causes small delta)")
     print()
     for cfg_label, d in [
-        ("768 planes × 4 KB  (current default)",   our_D1),
+        ("1024 planes × 4 KB (current default)",   our_D1),
         (" 64 planes × 8 MB  (HBFSim block size)", our_D2),
         ("1024 planes × 16 KB (HBFSim geom)",      our_D3),
     ]:

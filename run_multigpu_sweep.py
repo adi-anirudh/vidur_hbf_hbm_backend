@@ -25,7 +25,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 
 GPU_MEM_GB = {"a100": 80.0, "h100": 80.0, "a40": 45.0, "h200": 141.0}
 GPU_OVERHEAD_GB = 2.0
-HBF_CAPACITY_GB = 206.0   # 768 planes × 256 blocks × 256 pages × 4 KB ≈ 206 GB
+HBF_CAPACITY_GB = 384.0   # 1024 planes × 384 blocks × 256 pages × 4 KB = 384 GiB
 
 MODEL_INFO = {
     "microsoft/phi-2":                   dict(layers=32,  kv_heads=32, head_dim=80,  weights_gb=5.4),

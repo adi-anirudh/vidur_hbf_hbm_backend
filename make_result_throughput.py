@@ -112,10 +112,9 @@ render(compute(100, [524288, 786432, 1048576, 2097152]), 100, "result_goodput_sl
 
 
 def render_combined(fname):
-    """SLO-50 (top) + SLO-100 (bottom) sharing ONE legend and model labels.
-    Contexts differ per row (short vs long) so each keeps its context ticks."""
-    work50 = compute(50, [131072, 196608, 262144, 393216])
-    work100 = compute(100, [524288, 786432, 1048576, 2097152])
+    """ONE short wide panel: baseline goodput as a fraction of SPLASH; SPLASH is a
+    dashed reference line at 1.0 (no wall of identical bars). 100 ms SLO, long ctx."""
+    work = compute(100, [524288, 786432, 1048576, 2097152])
     NCc = 4
     cen = []; x = 0.0
     for m in range(len(MODELS)):
@@ -123,37 +122,37 @@ def render_combined(fname):
             cen.append(x); x += 1.0
         x += 1.15
     cen = np.array(cen)
-    bw = 0.205
-    fig, axes = plt.subplots(2, 1, figsize=(3.4, 2.9))
-    for ax, work, slo in ((axes[0], work50, 50), (axes[1], work100, 100)):
-        for i, (_, s) in enumerate(SYS):
-            xs = cen + (i - 1.5) * bw
-            ys = [(w["vals"][s] if w["vals"][s] is not None else 0.0) for w in work]
-            ax.bar(xs, ys, bw, color=COL[s], edgecolor=EDGE[s], linewidth=0.4,
-                   hatch=HATCH.get(s), zorder=3, label=DISP[s])
-            for w, xx in zip(work, xs):
-                if w["vals"][s] is None:
-                    ax.plot(xx, 0.05, marker="x", color="#d21f1f", ms=2.5, mew=0.9, zorder=6)
-        ax.set_ylim(0, 1.16); ax.set_yticks([0, 0.5, 1.0]); ax.tick_params(labelsize=6.5)
-        ax.set_ylabel("Norm.\nGoodput", fontsize=7.0, linespacing=0.9)
-        ax.grid(True, axis="y", ls=(0, (4, 3)), lw=0.4, color="#cfcfcf", zorder=0)
-        ax.set_axisbelow(True); ax.set_xlim(cen[0] - 0.65, cen[-1] + 0.65)
-        for sp in ("top", "right"): ax.spines[sp].set_visible(False)
-        for m in range(1, len(MODELS)):
-            ax.axvline((cen[m * NCc - 1] + cen[m * NCc]) / 2, color="#dddddd", lw=0.5, zorder=1)
-        ax.set_xticks(cen); ax.set_xticklabels([w["ctx"] for w in work], fontsize=6.0, rotation=90)
-        ax.tick_params(axis="x", pad=1.0)
-        ax.text(0.01, 0.95, f"SLO {slo} ms", transform=ax.transAxes, fontsize=6.5,
-                style="italic", color="#555", ha="left", va="top")
+    BARS = ["HBM-only", "H3", "Naive"]          # display keys; SPLASH shown as line
+    bw = 0.26
+    fig, ax = plt.subplots(figsize=(3.4, 1.5))
+    for i, s in enumerate(BARS):
+        xs = cen + (i - 1) * bw
+        ys = [(w["vals"][s] if w["vals"][s] is not None else 0.0) for w in work]
+        ax.bar(xs, ys, bw, color=COL[s], edgecolor=EDGE[s], linewidth=0.4,
+               zorder=3, label=DISP[s])
+        for w, xx in zip(work, xs):
+            if w["vals"][s] is None:
+                ax.plot(xx, 0.03, marker="x", color="#d21f1f", ms=2.5, mew=0.9, zorder=6)
+    ax.axhline(1.0, ls=(0, (4, 2)), lw=0.9, color=COL["SPLASH"], zorder=4)
+    ax.set_ylim(0, 1.12); ax.set_yticks([0, 0.5, 1.0]); ax.tick_params(labelsize=6.5)
+    ax.set_ylabel("Goodput\n/ SPLASH", fontsize=7.0, linespacing=0.9)
+    ax.grid(True, axis="y", ls=(0, (4, 3)), lw=0.4, color="#cfcfcf", zorder=0)
+    ax.set_axisbelow(True); ax.set_xlim(cen[0] - 0.65, cen[-1] + 0.65)
+    for sp in ("top", "right"): ax.spines[sp].set_visible(False)
+    for m in range(1, len(MODELS)):
+        ax.axvline((cen[m * NCc - 1] + cen[m * NCc]) / 2, color="#dddddd", lw=0.5, zorder=1)
+    ax.set_xticks(cen); ax.set_xticklabels([w["ctx"] for w in work], fontsize=5.6, rotation=90)
+    ax.tick_params(axis="x", pad=1.0)
     for m, (_, name) in enumerate(MODELS):
         xc = (cen[m * NCc] + cen[m * NCc + NCc - 1]) / 2
-        axes[1].text(xc, -0.85, name, ha="center", va="top", fontsize=6.8,
-                     transform=axes[1].get_xaxis_transform())
-    h, l = axes[0].get_legend_handles_labels()
-    fig.legend(h, l, loc="upper center", bbox_to_anchor=(0.5, 1.03), ncol=4,
-               frameon=False, fontsize=6.8, handlelength=0.9, handletextpad=0.3,
-               columnspacing=0.7)
-    fig.subplots_adjust(left=0.14, right=0.99, top=0.92, bottom=0.2, hspace=0.42)
+        ax.text(xc, -0.42, name, ha="center", va="top", fontsize=6.8,
+                transform=ax.get_xaxis_transform())
+    handles = [plt.Rectangle((0, 0), 1, 1, fc=COL[s], ec=EDGE[s], lw=0.4) for s in BARS]
+    handles.append(plt.Line2D([], [], ls=(0, (4, 2)), color=COL["SPLASH"], lw=0.9))
+    ax.legend(handles, [DISP[s] for s in BARS] + ["SPLASH (Ours)"], loc="lower center",
+              bbox_to_anchor=(0.5, 1.0), ncol=4, frameon=False, fontsize=6.2,
+              handlelength=0.9, handletextpad=0.3, columnspacing=0.7)
+    fig.subplots_adjust(left=0.16, right=0.99, top=0.86, bottom=0.34)
     for e in ("png", "pdf"):
         fig.savefig(f"results/plots/{fname}.{e}", bbox_inches="tight")
     plt.close(fig)

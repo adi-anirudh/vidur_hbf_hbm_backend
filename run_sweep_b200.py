@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Corrected Blackwell (B200-class) sweep: HBM 192 GB @ 8 TB/s, HBF 3072 GB (16x)
 @ 8 TB/s aggregate. Long-context subset, 8 context points 128K..2M, TP swept up to
-min(32, num_kv_heads) so both the 50 ms and 100 ms SLO operating points are
-measured. Dense (H3) + SPLASH. Streams to results/sweep_b200.csv (resumable).
+min(8, num_kv_heads) on one eight-GPU node so both the 50 ms and 100 ms SLO
+operating points are measured. Dense (H3) + SPLASH. Streams to
+results/sweep_b200.csv (resumable).
 
 HBF bandwidth is set via --backing_bw_gbps 8000 (flat aggregate = plane model at
 saturation). Device 'blackwell' now carries the corrected 192 GB / 8 TB/s HBM."""
@@ -16,19 +17,21 @@ from vidur.config.model_config import BaseModelConfig
 
 ROOT = Path(__file__).parent; PY = sys.executable
 RUNNER = str(ROOT / "run_point_hbf.py"); TOML = str(ROOT / "configs/hbf_paper.toml")
-OUT = ROOT / "results" / "sweep_b200.csv"; CACHE = str(ROOT / "pred_cache")
+OUT = ROOT / "results" / "sweep_b200.csv"
+CACHE = str(ROOT / "results" / "predictor_cache_eval")
 
-# Curated logical sweep: architecturally-unique models spanning 2.7B -> 405B
-# (dense/MoE, MHA/GQA-8/GQA-4). Only phi-2 and Llama-3.1-405B are new; the rest
-# are already in sweep_b200.csv (extra Qwen2-72B / Mixtral-8x22B rows stay, unused).
-MODELS = ["microsoft/phi-2", "meta-llama/Meta-Llama-3-8B",
-          "mistralai/Mixtral-8x7B-v0.1", "deepseek-ai/deepseek-llm-67b-chat",
-          "meta-llama/Meta-Llama-3-70B", "Qwen/Qwen3-235B-A22B",
+# Complete paper sweep: ten architectures spanning 2.7B--405B, dense/MoE, and
+# MHA/GQA. Keep this list aligned with results/main_sweep_summary.json.
+MODELS = ["microsoft/phi-2", "mistralai/Mistral-7B-v0.1",
+          "meta-llama/Meta-Llama-3-8B", "mistralai/Mixtral-8x7B-v0.1",
+          "deepseek-ai/deepseek-llm-67b-chat",
+          "meta-llama/Meta-Llama-3-70B", "Qwen/Qwen2-72B",
+          "mistralai/Mixtral-8x22B-v0.1", "Qwen/Qwen3-235B-A22B",
           "meta-llama/Meta-Llama-3.1-405B"]
 DEVICES = ["blackwell"]
 BATCHES = [1, 2, 4, 8, 16, 32, 64, 128]
 CONTEXTS = [131072, 196608, 262144, 393216, 524288, 786432, 1048576, 2097152]
-TP_CHOICES = (1, 2, 4, 8, 16, 32)
+TP_CHOICES = (1, 2, 4, 8)
 # (label, sparsity, tier). HBM-only holds the ENTIRE KV in HBM -> capacity-bounded TP
 # and frac=1.0 (no HBF). It is forced onto more GPUs than the HBF baselines and OOMs
 # once even max-TP can't fit the KV in HBM, so it comes out worse per-GPU than H3.
@@ -38,8 +41,8 @@ HBF_BW = "8000"
 # Naive token-granular sparse = SPLASH minus its two co-design wins: full-page
 # scoring (--hbf_sra: scan ALL cold K, no centroid) + read amplification
 # (--sparse_read_amplification). AMP measured @128K on Llama-3.1-8B (codesign
-# ablation); held constant across all contexts/models here (conservative at long ctx).
-NAIVE_AMP = "3.5636"
+# ablation); measured with the final 1024-plane layout at 10% selection.
+NAIVE_AMP = "3.5635"
 FIELDS = ["model", "device", "batch", "context_length", "baseline", "tp", "footprint_gb",
           "sparsity_fraction", "tpot_p50_ms", "tpot_p99_ms", "status", "wall_s"]
 
@@ -53,9 +56,29 @@ def _dimcache(model):
 def feasible_tps(model, device, batch, ctx, tier="hbf"):
     n_lay, n_kv, head_dim, tp_cap = _dimcache(model)
     total = weight_bytes(model) + batch * ctx * n_lay * 2 * n_kv * head_dim * 2
-    # HBM-only must fit weights+KV in HBM alone; HBF baselines get HBM+HBF (16x).
-    cap = (HBM_GB[device] if tier == "hbm" else HBM_GB[device] + HBF_GB) * 1e9
-    return [tp for tp in TP_CHOICES if tp <= tp_cap and total <= tp * cap], total / 1e9
+    valid = []
+    for tp in TP_CHOICES:
+        if tp > tp_cap:
+            continue
+        # HBF is a KV tier: model weights and the activation reserve must fit in
+        # HBM even when the combined HBM+HBF capacity is otherwise sufficient.
+        weights_and_reserve_per_gpu = weight_bytes(model) / tp + 4e9
+        if weights_and_reserve_per_gpu > HBM_GB[device] * 1e9:
+            continue
+        kv_per_gpu = (total - weight_bytes(model)) / tp
+        hbm_kv_capacity = (
+            HBM_GB[device] * 1e9 - weights_and_reserve_per_gpu
+        )
+        if tier == "hbm":
+            fits = kv_per_gpu <= hbm_kv_capacity
+        else:
+            cold_kv = max(0.0, kv_per_gpu - hbm_kv_capacity)
+            # One FP16 centroid per 16-token K page: 1/16 of K,
+            # hence 1/32 of the K+V cold-KV footprint.
+            fits = cold_kv * (1.0 + 1.0 / 32.0) <= HBF_GB * 1e9
+        if fits:
+            valid.append(tp)
+    return valid, total / 1e9
 
 
 def hbm_kv_fraction(model, device, batch, ctx, tp, tier="hbf"):
@@ -76,10 +99,9 @@ def run_point(model, device, batch, ctx, tp, label, sp, tier, timeout_s):
            "--context_length", str(ctx), "--decode_tokens", "4", "--num_requests", str(batch),
            "--tensor_parallel_size", str(tp), "--sparsity_fraction", str(sp),
            "--hbm_kv_fraction", f"{frac:.6f}", "--backing_bw_gbps", HBF_BW,
-           "--hbfsim_toml", TOML]
-    # NOTE: no shared --cache_dir -> run_point_hbf builds a private per-process cache.
-    # A shared cache races between workers on the same prediction table (esp. the huge
-    # 405B tables), corrupting them -> spurious FAILs. Private caches are race-free.
+           "--hbfsim_toml", TOML, "--cache_dir", CACHE]
+    # Shared cache writes are atomic and lock-protected; after the first point for a
+    # model/TP, the remaining grid is read-only and avoids retraining identical tables.
     if label == "Naive":
         cmd += ["--hbf_sra", "--sparse_read_amplification", NAIVE_AMP]
     t0 = time.perf_counter()
@@ -97,20 +119,29 @@ def main():
     import argparse
     ap = argparse.ArgumentParser(); ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--timeout", type=int, default=900); ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--only-model", choices=MODELS)
+    ap.add_argument("--only-context", type=int, choices=CONTEXTS)
+    ap.add_argument("--out", type=Path, default=OUT)
     args = ap.parse_args()
+    out = args.out
     done = set()
-    if OUT.exists():
-        for r in csv.DictReader(open(OUT)):
+    if out.exists():
+        for r in csv.DictReader(open(out)):
             if r["status"] == "OK" and r["tp"]:
                 done.add((r["model"], r["device"], int(r["batch"]), int(r["context_length"]), r["baseline"], int(r["tp"])))
-    new = not OUT.exists()
-    fh = open(OUT, "a", newline=""); w = csv.DictWriter(fh, fieldnames=FIELDS, extrasaction="ignore")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    new = not out.exists()
+    fh = open(out, "a", newline=""); w = csv.DictWriter(fh, fieldnames=FIELDS, extrasaction="ignore")
     if new: w.writeheader()
     runnable = []
     for model in MODELS:
+        if args.only_model and model != args.only_model:
+            continue
         for device in DEVICES:
             for batch in BATCHES:
                 for ctx in CONTEXTS:
+                    if args.only_context and ctx != args.only_context:
+                        continue
                     for label, sp, tier in BASELINES:
                         tps, foot = feasible_tps(model, device, batch, ctx, tier)
                         for tp in tps:
@@ -130,7 +161,7 @@ def main():
             except Exception as e: res = dict(tpot_p50_ms="", tpot_p99_ms="", status=f"ERR:{type(e).__name__}", wall_s="")
             w.writerow({**b, **res}); fh.flush(); n += 1
             if n % 25 == 0: print(f"  {n}/{len(runnable)}", flush=True)
-    fh.close(); print("SWEEP DONE ->", OUT, flush=True)
+    fh.close(); print("SWEEP DONE ->", out, flush=True)
 
 
 if __name__ == "__main__":

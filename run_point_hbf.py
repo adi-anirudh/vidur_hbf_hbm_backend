@@ -42,10 +42,8 @@ def build_argv(args, output_dir):
         "--replica_config_device",               args.device,
         "--replica_config_num_pipeline_stages",  "1",
         "--replica_config_tensor_parallel_size", str(args.tensor_parallel_size),
-        # NVLink collective profile. pairwise_nvlink only has 2/4-worker all_reduce,
-        # so TP=8 needs a DGX (8-GPU) profile. Blackwell has no measured collective
-        # in-repo -> we proxy with a real 8-GPU NVLink profile; the all_reduce is a
-        # <1%% additive vs the flash-dominated decode TPOT.
+        # Explicit eight-GPU Blackwell NVLink profile. The CSV is generated from
+        # the documented 1.8 TB/s/GPU link rate and an exposed latency parameter.
         "--replica_config_network_device",       args.network_device,
         # In-repo HBF predictor (LinearRegression base + NAND plane model)
         "--execution_time_predictor_config_type", PRED,
@@ -83,6 +81,11 @@ def build_argv(args, output_dir):
         "--no-metrics_config_enable_chrome_trace",
         "--log_level", "warning",
     ]
+    if args.all_reduce_input_file:
+        argv += [
+            PFX + "all_reduce_input_file",
+            os.path.abspath(args.all_reduce_input_file),
+        ]
     if args.hbf_sra:   # store_true bool flag (default False -> omit)
         argv.append(PFX + "hbf_sra")
     if args.naive_sparse:
@@ -90,6 +93,7 @@ def build_argv(args, output_dir):
     # Ablation load multipliers (default 1.0 -> no effect on Dense/SPLASH)
     argv += [PFX + "sparse_read_amplification", str(args.sparse_read_amplification),
              PFX + "plane_imbalance_factor",    str(args.plane_imbalance_factor),
+             PFX + "selection_page_tokens",     str(args.selection_page_tokens),
              PFX + "backing_bw_gbps",           str(args.backing_bw_gbps)]
     return argv
 
@@ -104,9 +108,11 @@ def main():
     p.add_argument("--num_requests", type=int, default=8)
     p.add_argument("--qps", type=float, default=1000.0)
     p.add_argument("--tensor_parallel_size", type=int, default=1)
-    # h100_dgx covers 2/4/8-worker NVLink all_reduce (pairwise only 2/4). Used as a
-    # Blackwell collective proxy; <1% of flash-dominated decode TPOT.
-    p.add_argument("--network_device", default="h100_dgx")
+    p.add_argument("--network_device", default="blackwell_nvl8")
+    p.add_argument(
+        "--all_reduce_input_file", default="",
+        help="Optional generated all-reduce CSV for communication sensitivity.",
+    )
     p.add_argument("--sparsity_fraction", type=float, default=1.0)
     p.add_argument("--hbm_kv_fraction", type=float, default=0.0)
     p.add_argument("--hbf_sra", action="store_true",
@@ -118,6 +124,15 @@ def main():
     p.add_argument("--sparse_read_amplification", type=float, default=1.0,
                    help="Page-read amplification for token-granular retrieval "
                         "(ablation; 1.0 = page-granular SPLASH).")
+    p.add_argument(
+        "--selection_page_tokens", type=int, default=16,
+        choices=(16, 32, 64, 128),
+        help=(
+            "KV tokens/head per physical HBF page: with separate FP16 K/V "
+            "head streams at dimension 128, 16/32/64/128 correspond to "
+            "4/8/16/32 KB for either stream."
+        ),
+    )
     p.add_argument("--plane_imbalance_factor", type=float, default=1.0,
                    help="Busiest-plane load multiplier for global (non-plane-"
                         "balanced) top-k (ablation; 1.0 = plane-balanced SPLASH).")

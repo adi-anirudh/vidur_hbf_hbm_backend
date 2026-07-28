@@ -126,7 +126,7 @@ def main() -> None:
     gold = ps.COLORS["token"]
     green = ps.COLORS["global"]
     plt.rcParams.update({"axes.titlesize":7.0,"axes.labelsize":6.4,"xtick.labelsize":5.8,"ytick.labelsize":5.8,"legend.fontsize":6.2})
-    fig, axes = plt.subplots(2, 2, figsize=(3.4, 3.0))
+    fig, axes = plt.subplots(2, 2, figsize=(3.4, 2.2))
 
     x = [r["selection_fraction"] * 100 for r in bp]
     y = [r["throughput_per_gpu"] for r in bp]

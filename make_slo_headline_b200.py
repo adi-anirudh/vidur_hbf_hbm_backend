@@ -7,7 +7,7 @@ import csv, math
 import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
 from collections import defaultdict
 
-CSV = "results/sweep_b200.csv"; OUT = "results/plots"
+CSV = "results/sweep_b200_weight_valid.csv"; OUT = "results/plots"
 C_H3, C_SP = "#c44e52", "#4c72b0"
 plt.rcParams.update({"font.family": "serif", "font.serif": ["DejaVu Serif"], "mathtext.fontset": "dejavuserif",
     "font.size": 8, "axes.labelsize": 8.5, "legend.fontsize": 7.5, "ytick.labelsize": 7, "axes.linewidth": 0.7,

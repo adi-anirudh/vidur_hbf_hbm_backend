@@ -150,7 +150,7 @@ def plot(rows: list[dict]) -> None:
     plt.rcParams.update({"axes.titlesize": 6.8, "axes.labelsize": 6.6,
                          "xtick.labelsize": 6.3, "ytick.labelsize": 6.3,
                          "legend.fontsize": 6.2})
-    fig, axes = plt.subplots(2, 1, figsize=(3.4, 2.7))
+    fig, axes = plt.subplots(2, 1, figsize=(3.4, 2.0))
     representative = 1_048_576
     rr = [r for r in rows if r["context_length"] == representative]
     x = np.arange(len(rr))

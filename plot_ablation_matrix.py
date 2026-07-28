@@ -92,7 +92,7 @@ style = {
 plt.rcParams.update({"axes.titlesize": 6.8, "axes.labelsize": 6.6,
                      "xtick.labelsize": 6.3, "ytick.labelsize": 6.3,
                      "legend.fontsize": 5.6})
-fig, axes = plt.subplots(2, 1, figsize=(3.4, 2.7))
+fig, axes = plt.subplots(2, 1, figsize=(3.4, 2.0))
 bar_order = ("SPLASH", "PlaneImbalance", "FullPageScore", "TokenGranular", "Dense")
 dense_target = selected[(TARGET_CONTEXT, "Dense")]["throughput_per_gpu"]
 bar_values = [

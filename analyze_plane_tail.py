@@ -228,7 +228,7 @@ def main() -> None:
     splash_c = ps.COLORS["splash"]
     sink_c = ps.COLORS["token"]
     plt.rcParams.update({"axes.titlesize":7.0,"axes.labelsize":6.4,"xtick.labelsize":5.8,"ytick.labelsize":5.8,"legend.fontsize":6.2})
-    fig, axes = plt.subplots(2, 2, figsize=(3.4, 3.0))
+    fig, axes = plt.subplots(2, 2, figsize=(3.4, 2.2))
 
     rank = 100 * (np.arange(1024) + 1) / 1024
     for name, color, label in (

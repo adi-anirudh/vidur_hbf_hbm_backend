@@ -291,7 +291,7 @@ def plot(frame: pd.DataFrame, prefix: Path) -> None:
         "axes.labelsize": 6.6, "xtick.labelsize": 5.8, "ytick.labelsize": 6.0,
         "legend.fontsize": 6.2,
     })
-    fig, axes = plt.subplots(2, 2, figsize=(3.4, 2.3), sharex=True, sharey=True)
+    fig, axes = plt.subplots(2, 2, figsize=(3.4, 2.0), sharex=True, sharey=True)
     x = np.arange(len(contexts))
     width = 0.26
     for ax, (model, model_label) in zip(axes.flat, MODELS):

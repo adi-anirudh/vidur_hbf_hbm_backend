@@ -171,7 +171,7 @@ def main() -> None:
         "axes.titlesize": 7.0, "axes.labelsize": 6.4,
         "xtick.labelsize": 5.7, "ytick.labelsize": 5.7, "legend.fontsize": 5.5,
     })
-    fig, axA = plt.subplots(figsize=(3.4, 2.75))
+    fig, axA = plt.subplots(figsize=(3.4, 2.45))
     fig.subplots_adjust(left=0.225, right=0.9, top=0.885, bottom=0.17)
 
     # (a) Complete model x context throughput speedup matrix at the 100-ms SLO.

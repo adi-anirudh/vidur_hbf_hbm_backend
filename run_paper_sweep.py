@@ -29,7 +29,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 # ---------------------------------------------------------------------------
 # Hardware constants (must match hbf_default.toml)
 # ---------------------------------------------------------------------------
-TOTAL_PLANES = 768      # 96 planes/die × 8 dies/stack × 1 stack
+TOTAL_PLANES = 1024     # 64 planes/die × 16 dies/stack × 1 stack
 TR_NS        = 4096     # tR = 4 µs
 PAGE_BYTES   = 4096     # 4 KB NAND page
 BLOCK_SIZE   = 16       # Vidur KV block = 16 tokens

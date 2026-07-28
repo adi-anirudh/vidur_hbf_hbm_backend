@@ -1,26 +1,29 @@
 #!/usr/bin/env python3
-"""Co-design ablation at 128K on Blackwell: sweep batch for five systems at TP=8
+"""Co-design ablation at 1M on Blackwell: sweep batch for five systems at TP=8
 so each can be loaded to its throughput-maximizing point under the decode SLO.
-Same SLO operating-point methodology as the headline throughput figure.
+Uses the same 8 TB/s aggregate HBF path and per-point HBM hot-window fraction as
+the headline sweep.
 
   Dense (H3)         sparsity 1.0
   SPLASH             sparsity 0.1
   Full-page scoring  sparsity 0.1 + hbf_sra
   Token-granular     sparsity 0.1 + amp   = 3.56   (measured, real Llama-3.1-8B attn @128K)
-  Plane imbalance    sparsity 0.1 + imbal = 1.92   (measured, real Llama-3.1-8B attn @128K)
+  Plane imbalance    sparsity 0.1 + imbal = 2.175  (measured, real Llama-3.1-8B attn @128K)
 """
 from __future__ import annotations
 import csv, re, subprocess, sys, time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
+from evaluation_common import BATCHES, PLATFORM, hbm_kv_fraction
 
 ROOT = Path(__file__).parent; PY = sys.executable
 RUNNER = str(ROOT / "run_point_hbf.py"); TOML = str(ROOT / "configs/hbf_paper.toml")
-CACHE = str(ROOT / "pred_cache"); OUT = ROOT / "results" / "ablation.csv"
+CACHE = str(ROOT / "results" / "predictor_cache_eval")
+OUT = ROOT / "results" / "ablation.csv"
 
-MODEL = "meta-llama/Meta-Llama-3-8B"; DEVICE = "blackwell"; TP = 8; CTX = 131072
-BATCHES = [1, 2, 4, 8, 16, 24, 32, 48, 64, 96, 128, 192, 256, 320, 384, 512]
-AMP = 3.5636; IMB = 1.9234          # measured @128K (codesign_factors.jsonl)
+MODEL = "meta-llama/Meta-Llama-3-8B"; DEVICE = "blackwell"; TP = 8; CTX = 1048576
+HBF_BW = "8000"
+AMP = 3.5635; IMB = 2.1750          # measured @128K, 1024 planes (codesign_1024.jsonl)
 SYSTEMS = [
     ("Dense",          ["--sparsity_fraction", "1.0"]),
     ("SPLASH",         ["--sparsity_fraction", "0.1"]),
@@ -35,11 +38,13 @@ FIELDS = ["model", "device", "tp", "batch", "context_length", "system",
 
 
 def run_point(system, flags, batch, timeout_s=900):
+    hot = hbm_kv_fraction(MODEL, batch, CTX, TP, "hbf")
     cmd = [PY, RUNNER, "--model", MODEL, "--device", DEVICE,
            "--batch_size", str(batch), "--context_length", str(CTX),
            "--decode_tokens", "4", "--num_requests", str(batch),
            "--tensor_parallel_size", str(TP), "--hbfsim_toml", TOML,
-           "--cache_dir", CACHE] + flags
+           "--cache_dir", CACHE, "--hbm_kv_fraction", str(hot),
+           "--backing_bw_gbps", str(PLATFORM.effective_hbf_bw_gbps())] + flags
     t0 = time.perf_counter()
     try:
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s, cwd=str(ROOT))

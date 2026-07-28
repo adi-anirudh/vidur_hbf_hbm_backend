@@ -355,7 +355,7 @@ def main() -> None:
     token_c = ps.COLORS["token"]
     page_c = ps.COLORS["splash"]
     plt.rcParams.update({"axes.titlesize":7.0,"axes.labelsize":6.4,"xtick.labelsize":5.8,"ytick.labelsize":5.8,"legend.fontsize":6.2})
-    fig, axes = plt.subplots(2, 2, figsize=(3.4, 3.0))
+    fig, axes = plt.subplots(2, 2, figsize=(3.4, 2.2))
 
     x = np.arange(len(suite_quality))
     width = 0.38
