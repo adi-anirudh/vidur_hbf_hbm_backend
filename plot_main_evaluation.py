@@ -171,15 +171,8 @@ def main() -> None:
         "axes.titlesize": 7.0, "axes.labelsize": 6.4,
         "xtick.labelsize": 5.7, "ytick.labelsize": 5.7, "legend.fontsize": 5.5,
     })
-    import matplotlib.gridspec as gridspec
-    from matplotlib.patches import Patch
-    fig = plt.figure(figsize=(3.4, 6.7))
-    gs = gridspec.GridSpec(
-        4, 1, height_ratios=[2.75, 1.05, 1.05, 1.05], hspace=0.66,
-        left=0.205, right=0.895, top=0.97, bottom=0.055,
-    )
-    axA = fig.add_subplot(gs[0]); axB = fig.add_subplot(gs[1])
-    axC = fig.add_subplot(gs[2]); axD = fig.add_subplot(gs[3])
+    fig, axA = plt.subplots(figsize=(3.4, 2.75))
+    fig.subplots_adjust(left=0.225, right=0.9, top=0.885, bottom=0.17)
 
     # (a) Complete model x context throughput speedup matrix at the 100-ms SLO.
     selected = chosen[100.0]
@@ -212,67 +205,10 @@ def main() -> None:
                 color="white" if np.isfinite(matrix[i, j])
                 and matrix[i, j] > (1 + vmax) / 2 else "black",
             )
-    axA.set_title("(a) Throughput/GPU speedup, SPLASH / H3 (100-ms SLO)")
+    axA.set_title("SPLASH / H3 throughput/GPU speedup (100-ms SLO)")
     cb = fig.colorbar(im, ax=axA, fraction=0.045, pad=0.02)
     cb.set_label("SPLASH / H3", fontsize=6.0)
     cb.ax.tick_params(labelsize=5.2)
-
-    # (b) Speedup increases with context at both service targets.
-    for slo, marker in ((50.0, "s"), (100.0, "o")):
-        items = summary["slo"][str(int(slo))]["splash_vs_dense"]["by_context"]
-        y = [items[str(c)]["geomean_speedup"] for c in contexts]
-        axB.plot(range(len(contexts)), y, marker=marker, lw=1.4, ms=3.0,
-                 label=f"{int(slo)} ms")
-    axB.set_xticks(range(len(contexts)))
-    axB.set_xticklabels([CONTEXT_LABEL[c] for c in contexts], rotation=45)
-    axB.set_ylabel("Geomean\nspeedup")
-    axB.set_title("(b) Speedup scales with context")
-    axB.legend(frameon=False, ncol=2, handlelength=1.2, columnspacing=0.9,
-               loc="upper left")
-    ps.finish_axis(axB)
-
-    # (c) Feasible model-context coverage.
-    x = np.arange(len(BASELINES))
-    width = 0.38
-    for offset, slo in ((-width / 2, 50.0), (width / 2, 100.0)):
-        vals = [summary["slo"][str(int(slo))]["feasible_workloads"][b]
-                for b in BASELINES]
-        axC.bar(x + offset, vals, width, color=[COLOR[b] for b in BASELINES],
-                alpha=0.72 if slo == 50 else 1.0, edgecolor="black",
-                linewidth=0.35)
-    axC.axhline(total_workloads, color="#777", ls=":", lw=1)
-    axC.set_xticks(x)
-    axC.set_xticklabels([LABEL[b] for b in BASELINES], rotation=12)
-    axC.set_ylabel("Feasible\nworkloads")
-    axC.set_ylim(0, total_workloads * 1.24)
-    axC.set_title(f"(c) SLO-feasible workloads (of {total_workloads})")
-    ps.finish_axis(axC, grid_axis="y")
-    axC.legend(
-        handles=[Patch(fc="#9aa0a6", alpha=0.72, ec="black", lw=0.35, label="50 ms"),
-                 Patch(fc="#9aa0a6", alpha=1.0, ec="black", lw=0.35, label="100 ms")],
-        frameon=False, ncol=2, handlelength=1.0, columnspacing=0.9,
-        loc="upper center")
-
-    # (d) Decompose independently optimized throughput into its two exact
-    # multiplicative factors: concurrency/GPU and inverse TPOT.
-    items = summary["slo"]["100"]["splash_vs_dense"]["by_context"]
-    concurrency = [items[str(c)]["geomean_concurrency_per_gpu_ratio"] for c in contexts]
-    latency = [items[str(c)]["geomean_tpot_ratio"] for c in contexts]
-    throughput = [items[str(c)]["geomean_speedup"] for c in contexts]
-    for values, label, color, marker in (
-        (concurrency, "Concurrency/GPU", ps.COLORS["global"], "^"),
-        (latency, "TPOT reduction", ps.COLORS["token"], "s"),
-        (throughput, "Throughput/GPU", ps.COLORS["splash"], "o"),
-    ):
-        axD.plot(range(len(contexts)), values, marker=marker, lw=1.4, ms=3.0,
-                 color=color, label=label)
-    axD.axhline(1.0, color="#777", ls=":", lw=1)
-    axD.set_xticks(range(len(contexts)))
-    axD.set_xticklabels([CONTEXT_LABEL[c] for c in contexts], rotation=45)
-    axD.set_ylabel("Factor\nvs H3")
-    axD.set_title("(d) Source of 100-ms throughput gain")
-    axD.legend(frameon=False, ncol=1, handlelength=1.2, loc="upper left")
-    ps.finish_axis(axD, grid_axis="y")
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     for ext in ("pdf", "png"):

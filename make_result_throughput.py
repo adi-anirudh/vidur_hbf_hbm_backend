@@ -116,7 +116,7 @@ def render_singlecol(fname):
     ctxs8 = ["128K", "192K", "256K", "384K", "512K", "768K", "1M", "2M"]
     centers = np.arange(8)
     bw = 0.2
-    fig, axes = plt.subplots(len(MODELS), 1, figsize=(3.4, 6.15),
+    fig, axes = plt.subplots(len(MODELS), 1, figsize=(3.4, 3.4),
                              sharex=True, sharey=True)
     for ax, (mk, md) in zip(axes, MODELS):
         work = [w for w in short if w["model"] == md] + \
@@ -136,20 +136,20 @@ def render_singlecol(fname):
         ax.set_xlim(-0.6, 7.6)
         for sp in ("top", "right"): ax.spines[sp].set_visible(False)
         ax.text(0.012, 0.9, md, transform=ax.transAxes, ha="left", va="top",
-                fontsize=6.6, fontweight="bold")
+                fontsize=6.0, fontweight="bold")
         ax.tick_params(labelsize=5.8)
     axes[-1].set_xticks(centers)
     axes[-1].set_xticklabels(ctxs8, rotation=45, fontsize=5.8)
-    axes[0].text(1.5, 1.24, "SLO 50 ms", ha="center", va="bottom", fontsize=6.2,
+    axes[0].text(1.5, 1.30, "SLO 50 ms", ha="center", va="bottom", fontsize=6.2,
                  style="italic", color="#555", clip_on=False)
-    axes[0].text(5.5, 1.24, "SLO 100 ms", ha="center", va="bottom", fontsize=6.2,
+    axes[0].text(5.5, 1.30, "SLO 100 ms", ha="center", va="bottom", fontsize=6.2,
                  style="italic", color="#555", clip_on=False)
     fig.supylabel("Normalized Goodput", fontsize=7.0, x=0.02)
     h, l = axes[0].get_legend_handles_labels()
     fig.legend(h, l, loc="upper center", bbox_to_anchor=(0.5, 1.004), ncol=4,
                frameon=False, fontsize=6.2, handlelength=1.1, handletextpad=0.4,
                columnspacing=1.1)
-    fig.subplots_adjust(left=0.135, right=0.985, top=0.925, bottom=0.055, hspace=0.32)
+    fig.subplots_adjust(left=0.135, right=0.985, top=0.9, bottom=0.08, hspace=0.14)
     for e in ("png", "pdf"):
         fig.savefig(f"results/plots/{fname}.{e}")
     plt.close(fig)

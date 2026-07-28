@@ -13,7 +13,8 @@ from sweep_capacity import weight_bytes, HBM_GB
 
 HBM = HBM_GB["blackwell"] * 1e9
 SLO = 100.0
-ROWS = [r for r in csv.DictReader(open("results/sweep_b200.csv")) if r["status"] == "OK"]
+ROWS = [r for r in csv.DictReader(open("results/sweep_b200_weight_valid.csv"))
+        if r["status"] == "OK"]
 MODELS = [("meta-llama/Meta-Llama-3-8B", "Llama-3-8B"),
           ("mistralai/Mixtral-8x7B-v0.1", "Mixtral-8×7B"),
           ("deepseek-ai/deepseek-llm-67b-chat", "DeepSeek-67B"),
@@ -121,3 +122,54 @@ def render(pi, plabel, fname):
 
 render(0, "p50", "result_tpot_p50")
 render(1, "p99", "result_tpot_p99")
+
+
+def render_singlecol(fname):
+    """Compact single-column (IEEE 3.4in) TPOT: 5 model panels stacked, 4 long
+    contexts; bar = p50, whisker = p99, dashed SLO line. All datapoints."""
+    cen = np.arange(NC)
+    bw = 0.26
+    YMAX = 400
+    fig, axes = plt.subplots(len(MODELS), 1, figsize=(3.4, 3.05),
+                             sharex=True, sharey=True)
+    for ax, (mk, md) in zip(axes, MODELS):
+        mw = [w for w in work if w["model"] == md]
+        for i, (sk, _) in enumerate(SYS):
+            xs = cen + (i - 1) * bw
+            for w, xx in zip(mw, xs):
+                v = w["vals"][sk]
+                if v is None:
+                    ax.plot(xx, 10, marker="x", color="#d21f1f", ms=3, mew=1.0, zorder=6)
+                    continue
+                p50 = min(v[0], YMAX); p99 = min(v[1], YMAX)
+                ax.bar(xx, p50, bw, color=COL[sk], edgecolor=EDGE[sk], linewidth=0.4,
+                       hatch=HATCH.get(sk), zorder=3)
+                if p99 > p50:
+                    ax.plot([xx, xx], [p50, p99], color="#333", lw=0.5, zorder=5)
+        ax.axhline(SLO, ls=(0, (4, 2)), lw=0.8, color="#d21f1f", zorder=4)
+        ax.set_ylim(0, YMAX); ax.set_yticks([0, 200, 400])
+        ax.grid(True, axis="y", ls=(0, (4, 3)), lw=0.4, color="#cfcfcf", zorder=0)
+        ax.set_axisbelow(True)
+        ax.set_xlim(-0.6, NC - 0.4)
+        for sp in ("top", "right"): ax.spines[sp].set_visible(False)
+        ax.text(0.012, 0.9, md, transform=ax.transAxes, ha="left", va="top",
+                fontsize=6.0, fontweight="bold")
+        ax.tick_params(labelsize=5.8)
+    axes[-1].set_xticks(cen)
+    axes[-1].set_xticklabels([CTXLAB[c] for c in CTXS], rotation=45, fontsize=5.8)
+    fig.supylabel("TPOT (ms)", fontsize=7.0, x=0.02)
+    handles = [plt.Rectangle((0, 0), 1, 1, fc=COL[s], ec=EDGE[s], lw=0.4,
+                             hatch=HATCH.get(s)) for s, _ in SYS]
+    handles.append(plt.Line2D([], [], ls=(0, (4, 2)), color="#d21f1f", lw=0.8))
+    labs = [d for _, d in SYS] + ["SLO 100 ms"]
+    fig.legend(handles, labs, loc="upper center", bbox_to_anchor=(0.5, 1.004),
+               ncol=4, frameon=False, fontsize=6.0, handlelength=1.1,
+               handletextpad=0.4, columnspacing=1.0)
+    fig.subplots_adjust(left=0.14, right=0.985, top=0.92, bottom=0.115, hspace=0.14)
+    for e in ("png", "pdf"):
+        fig.savefig(f"results/plots/{fname}.{e}")
+    plt.close(fig)
+    print("wrote", fname)
+
+
+render_singlecol("result_tpot_singlecol")

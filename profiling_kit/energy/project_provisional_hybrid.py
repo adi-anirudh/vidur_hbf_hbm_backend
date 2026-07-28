@@ -291,7 +291,7 @@ def plot(frame: pd.DataFrame, prefix: Path) -> None:
         "axes.labelsize": 6.6, "xtick.labelsize": 5.8, "ytick.labelsize": 6.0,
         "legend.fontsize": 6.2,
     })
-    fig, axes = plt.subplots(4, 1, figsize=(3.4, 5.4), sharex=True, sharey=True)
+    fig, axes = plt.subplots(4, 1, figsize=(3.4, 2.95), sharex=True, sharey=True)
     x = np.arange(len(contexts))
     width = 0.26
     for ax, (model, model_label) in zip(axes.flat, MODELS):
@@ -327,8 +327,8 @@ def plot(frame: pd.DataFrame, prefix: Path) -> None:
         bbox_to_anchor=(0.5, 1.005), frameon=False, handlelength=1.2,
         columnspacing=1.2,
     )
-    fig.subplots_adjust(left=0.165, right=0.975, top=0.945, bottom=0.085,
-                        hspace=0.3)
+    fig.subplots_adjust(left=0.165, right=0.975, top=0.9, bottom=0.14,
+                        hspace=0.15)
     prefix.parent.mkdir(parents=True, exist_ok=True)
     for suffix in (".png", ".pdf"):
         fig.savefig(prefix.with_suffix(suffix))
