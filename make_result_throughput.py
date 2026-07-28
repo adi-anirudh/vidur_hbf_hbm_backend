@@ -137,7 +137,7 @@ def render_combined(fname):
                     ax.bar(xx, v, bw, color=COL[sd], edgecolor=EDGE[sd], linewidth=0.4,
                            hatch=HATCH.get(sd), zorder=3)
         ax.set_ylim(0, 1.06); ax.set_yticks([0, 0.5, 1.0]); ax.tick_params(labelsize=6.5)
-        ax.set_ylabel("Goodput\n/ SPLASH", fontsize=7.0, linespacing=0.9)
+        ax.set_ylabel("Normalized\nGoodput", fontsize=7.0, linespacing=0.9)
         ax.grid(True, axis="y", ls=(0, (4, 3)), lw=0.4, color="#cfcfcf", zorder=0)
         ax.set_axisbelow(True); ax.set_xlim(cen[0] - 0.65, cen[-1] + 0.65)
         for sp in ("top", "right"): ax.spines[sp].set_visible(False)
