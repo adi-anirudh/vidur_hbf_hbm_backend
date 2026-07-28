@@ -20,7 +20,7 @@ MODELS = [("meta-llama/Meta-Llama-3-8B", "Llama-3-8B"),
           ("meta-llama/Meta-Llama-3-70B", "Llama-3-70B"),
           ("Qwen/Qwen3-235B-A22B", "Qwen3-235B")]
 CTXS = [524288, 786432, 1048576, 2097152]
-CTXLAB = {524288: "512K", 786432: "768K", 1048576: "1M", 2097152: "2M"}
+CTXLAB = {131072: "128K", 196608: "192K", 262144: "256K", 393216: "384K", 524288: "512K", 786432: "768K", 1048576: "1M", 2097152: "2M"}
 SYS = [("Dense", "H3"), ("Naive", "Naive Sparse"), ("Sparse", "SPLASH (Ours)")]
 COL = {"Dense": "#e6913a", "Naive": "#eed6a0", "Sparse": "#8279bd"}
 EDGE = {"Dense": "#2b2b2b", "Naive": "#2b2b2b", "Sparse": "#3d3570"}
@@ -116,45 +116,75 @@ def render(pi, plabel, fname):
     print(f"wrote {fname}")
 
 
+def compute_work(slo, ctxs):
+    """TPOT (p50, p99) of every baseline at SPLASH's goodput-optimal point per (model, ctx)."""
+    w = []
+    for mk, md in MODELS:
+        for c in ctxs:
+            op = None
+            for r in ROWS:
+                if r["model"] == mk and int(r["context_length"]) == c and r["baseline"] == "Sparse":
+                    p50, tp = float(r["tpot_p50_ms"]), int(r["tp"])
+                    if p50 <= slo and wfits(mk, tp):
+                        g = int(r["batch"]) * 1000.0 / p50 / tp
+                        if op is None or g > op[0]:
+                            op = (g, int(r["batch"]), tp)
+            cell = {sk: (idx.get((mk, c, sk, op[1], op[2])) if op else None) for sk, _ in SYS}
+            w.append(dict(ctx=CTXLAB[c], vals=cell))
+    return w
+
+
 def render_combined(fname):
-    """ONE short wide panel: bar = p50, whisker = p99, dashed SLO. Single column."""
-    bw = 0.235; YMAX = 400
-    fig, ax = plt.subplots(figsize=(3.4, 1.5))
-    for i, (sk, _) in enumerate(SYS):
-        xs = centers + (i - 1) * bw
-        for w, xx in zip(work, xs):
-            v = w["vals"][sk]
-            if v is None:
-                continue
-            p50 = min(v[0], YMAX); p99 = min(v[1], YMAX)
-            ax.bar(xx, p50, bw, color=COL[sk], edgecolor=EDGE[sk], linewidth=0.4,
-                   hatch=HATCH.get(sk), zorder=3)
-            if p99 > p50:
+    """Two panels (SLO 50 ms, SLO 100 ms). bar = p50, whisker = p99 (always drawn),
+    dashed SLO line. Same size as the throughput figure."""
+    short_ctx = [131072, 196608, 262144, 393216]
+    long_ctx = [524288, 786432, 1048576, 2097152]
+    panels = [(compute_work(50, short_ctx), short_ctx, 50),
+              (compute_work(100, long_ctx), long_ctx, 100)]
+    bw = 0.235; YMAX = 420; NCloc = 4
+    cen = []; x = 0.0
+    for m in range(len(MODELS)):
+        for _ in range(NCloc):
+            cen.append(x); x += 1.0
+        x += 1.15
+    cen = np.array(cen)
+    fig, axes = plt.subplots(2, 1, figsize=(3.4, 2.7))
+    for ax, (work, ctxs, slo) in zip(axes, panels):
+        for i, (sk, _) in enumerate(SYS):
+            xs = cen + (i - 1) * bw
+            for w, xx in zip(work, xs):
+                v = w["vals"][sk]
+                if v is None:
+                    ax.plot(xx, 12, marker="x", color="#d21f1f", ms=2.3, mew=0.8, zorder=6)
+                    continue
+                p50 = min(v[0], YMAX); p99 = min(v[1], YMAX)
+                ax.bar(xx, p50, bw, color=COL[sk], edgecolor=EDGE[sk], linewidth=0.4,
+                       hatch=HATCH.get(sk), zorder=3)
                 ax.plot([xx, xx], [p50, p99], color="#333", lw=0.5, zorder=5)
-    ax.axhline(SLO, ls=(0, (4, 2)), lw=0.8, color="#d21f1f", zorder=4)
-    ax.set_ylim(0, YMAX); ax.set_yticks([0, 200, 400]); ax.tick_params(labelsize=6.5)
-    ax.set_ylabel("TPOT (ms)", fontsize=7.5)
-    ax.grid(True, axis="y", ls=(0, (4, 3)), lw=0.4, color="#cfcfcf", zorder=0)
-    ax.set_axisbelow(True)
-    ax.set_xlim(centers[0] - 0.65, centers[-1] + 0.65)
-    for sp in ("top", "right"): ax.spines[sp].set_visible(False)
-    for m in range(1, len(MODELS)):
-        ax.axvline((centers[m * NC - 1] + centers[m * NC]) / 2, color="#dddddd",
-                   lw=0.5, zorder=1)
-    ax.set_xticks(centers)
-    ax.set_xticklabels([w["ctx"] for w in work], fontsize=5.6, rotation=90)
-    ax.tick_params(axis="x", pad=1.0)
+        ax.axhline(slo, ls=(0, (4, 2)), lw=0.8, color="#d21f1f", zorder=4)
+        ax.set_ylim(0, YMAX); ax.set_yticks([0, 200, 400]); ax.tick_params(labelsize=6.5)
+        ax.set_ylabel("TPOT (ms)", fontsize=7.0)
+        ax.grid(True, axis="y", ls=(0, (4, 3)), lw=0.4, color="#cfcfcf", zorder=0)
+        ax.set_axisbelow(True); ax.set_xlim(cen[0] - 0.65, cen[-1] + 0.65)
+        for sp in ("top", "right"): ax.spines[sp].set_visible(False)
+        for m in range(1, len(MODELS)):
+            ax.axvline((cen[m * NCloc - 1] + cen[m * NCloc]) / 2, color="#dddddd", lw=0.5, zorder=1)
+        ax.set_xticks(cen)
+        ax.set_xticklabels([w["ctx"] for w in work], fontsize=5.6, rotation=90)
+        ax.tick_params(axis="x", pad=1.0)
+        ax.text(0.01, 0.96, f"SLO {slo} ms", transform=ax.transAxes, fontsize=6.5,
+                style="italic", color="#555", ha="left", va="top")
     for m, (_, name) in enumerate(MODELS):
-        xc = (centers[m * NC] + centers[m * NC + NC - 1]) / 2
-        ax.text(xc, -0.42, name, ha="center", va="top", fontsize=6.8,
-                transform=ax.get_xaxis_transform())
+        xc = (cen[m * NCloc] + cen[m * NCloc + NCloc - 1]) / 2
+        axes[1].text(xc, -0.72, name, ha="center", va="top", fontsize=6.8,
+                     transform=axes[1].get_xaxis_transform())
     handles = [plt.Rectangle((0, 0), 1, 1, fc=COL[s], ec=EDGE[s], lw=0.4,
                              hatch=HATCH.get(s)) for s, _ in SYS]
     handles.append(plt.Line2D([], [], ls=(0, (4, 2)), color="#d21f1f", lw=0.8))
-    ax.legend(handles, [d for _, d in SYS] + ["SLO 100 ms"], loc="lower center",
-              bbox_to_anchor=(0.5, 1.0), ncol=4, frameon=False, fontsize=6.5,
-              handlelength=0.9, handletextpad=0.3, columnspacing=0.8)
-    fig.subplots_adjust(left=0.13, right=0.99, top=0.86, bottom=0.34)
+    fig.legend(handles, [d for _, d in SYS] + ["SLO"], loc="upper center",
+               bbox_to_anchor=(0.5, 1.02), ncol=4, frameon=False, fontsize=6.2,
+               handlelength=0.9, handletextpad=0.3, columnspacing=0.8)
+    fig.subplots_adjust(left=0.14, right=0.99, top=0.9, bottom=0.2, hspace=0.5)
     for e in ("png", "pdf"):
         fig.savefig(f"results/plots/{fname}.{e}", bbox_inches="tight")
     plt.close(fig)
