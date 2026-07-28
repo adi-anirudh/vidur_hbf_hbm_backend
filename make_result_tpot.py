@@ -135,12 +135,11 @@ def compute_work(slo, ctxs):
 
 
 def render_combined(fname):
-    """Two panels (SLO 50 ms, SLO 100 ms). bar = p50, whisker = p99 (always drawn),
-    dashed SLO line. Same size as the throughput figure."""
-    short_ctx = [131072, 196608, 262144, 393216]
+    """One short panel: TPOT (bar = p50, whisker = p99) at SPLASH\'s 100 ms
+    operating point over long contexts. Dashed line = 100 ms SLO; baselines sit
+    2-4x above it, SPLASH below."""
     long_ctx = [524288, 786432, 1048576, 2097152]
-    panels = [(compute_work(50, short_ctx), short_ctx, 50),
-              (compute_work(100, long_ctx), long_ctx, 100)]
+    work = compute_work(100, long_ctx)
     bw = 0.235; YMAX = 420; NCloc = 4
     cen = []; x = 0.0
     for m in range(len(MODELS)):
@@ -148,43 +147,40 @@ def render_combined(fname):
             cen.append(x); x += 1.0
         x += 1.15
     cen = np.array(cen)
-    fig, axes = plt.subplots(2, 1, figsize=(3.4, 1.9))
-    for ax, (work, ctxs, slo) in zip(axes, panels):
-        for i, (sk, _) in enumerate(SYS):
-            xs = cen + (i - 1) * bw
-            for w, xx in zip(work, xs):
-                v = w["vals"][sk]
-                if v is None:
-                    ax.plot(xx, 12, marker="x", color="#d21f1f", ms=2.3, mew=0.8, zorder=6)
-                    continue
-                p50 = min(v[0], YMAX); p99 = min(v[1], YMAX)
-                ax.bar(xx, p50, bw, color=COL[sk], edgecolor=EDGE[sk], linewidth=0.4,
-                       hatch=HATCH.get(sk), zorder=3)
-                ax.plot([xx, xx], [p50, p99], color="#333", lw=0.5, zorder=5)
-        ax.axhline(slo, ls=(0, (4, 2)), lw=0.8, color="#d21f1f", zorder=4)
-        ax.set_ylim(0, YMAX); ax.set_yticks([0, 200, 400]); ax.tick_params(labelsize=6.5)
-        ax.set_ylabel("TPOT (ms)", fontsize=7.0)
-        ax.grid(True, axis="y", ls=(0, (4, 3)), lw=0.4, color="#cfcfcf", zorder=0)
-        ax.set_axisbelow(True); ax.set_xlim(cen[0] - 0.65, cen[-1] + 0.65)
-        for sp in ("top", "right"): ax.spines[sp].set_visible(False)
-        for m in range(1, len(MODELS)):
-            ax.axvline((cen[m * NCloc - 1] + cen[m * NCloc]) / 2, color="#dddddd", lw=0.5, zorder=1)
-        ax.set_xticks(cen)
-        ax.set_xticklabels([w["ctx"] for w in work], fontsize=5.6, rotation=90)
-        ax.tick_params(axis="x", pad=1.0)
-        ax.text(0.01, 0.96, f"SLO {slo} ms", transform=ax.transAxes, fontsize=6.5,
-                style="italic", color="#555", ha="left", va="top")
+    fig, ax = plt.subplots(figsize=(3.4, 1.35))
+    for i, (sk, _) in enumerate(SYS):
+        xs = cen + (i - 1) * bw
+        for w, xx in zip(work, xs):
+            v = w["vals"][sk]
+            if v is None:
+                ax.plot(xx, 12, marker="x", color="#d21f1f", ms=2.3, mew=0.8, zorder=6)
+                continue
+            p50 = min(v[0], YMAX); p99 = min(v[1], YMAX)
+            ax.bar(xx, p50, bw, color=COL[sk], edgecolor=EDGE[sk], linewidth=0.4,
+                   hatch=HATCH.get(sk), zorder=3)
+            ax.plot([xx, xx], [p50, p99], color="#333", lw=0.5, zorder=5)
+    ax.axhline(100, ls=(0, (4, 2)), lw=0.8, color="#d21f1f", zorder=4)
+    ax.set_ylim(0, YMAX); ax.set_yticks([0, 200, 400]); ax.tick_params(labelsize=6.5)
+    ax.set_ylabel("TPOT (ms)", fontsize=7.5)
+    ax.grid(True, axis="y", ls=(0, (4, 3)), lw=0.4, color="#cfcfcf", zorder=0)
+    ax.set_axisbelow(True); ax.set_xlim(cen[0] - 0.65, cen[-1] + 0.65)
+    for sp in ("top", "right"): ax.spines[sp].set_visible(False)
+    for m in range(1, len(MODELS)):
+        ax.axvline((cen[m * NCloc - 1] + cen[m * NCloc]) / 2, color="#dddddd", lw=0.5, zorder=1)
+    ax.set_xticks(cen)
+    ax.set_xticklabels([w["ctx"] for w in work], fontsize=5.6, rotation=90)
+    ax.tick_params(axis="x", pad=1.0)
     for m, (_, name) in enumerate(MODELS):
         xc = (cen[m * NCloc] + cen[m * NCloc + NCloc - 1]) / 2
-        axes[1].text(xc, -0.95, name, ha="center", va="top", fontsize=6.8,
-                     transform=axes[1].get_xaxis_transform())
+        ax.text(xc, -0.52, name, ha="center", va="top", fontsize=6.8,
+                transform=ax.get_xaxis_transform())
     handles = [plt.Rectangle((0, 0), 1, 1, fc=COL[s], ec=EDGE[s], lw=0.4,
                              hatch=HATCH.get(s)) for s, _ in SYS]
     handles.append(plt.Line2D([], [], ls=(0, (4, 2)), color="#d21f1f", lw=0.8))
-    fig.legend(handles, [d for _, d in SYS] + ["SLO"], loc="upper center",
-               bbox_to_anchor=(0.5, 1.02), ncol=4, frameon=False, fontsize=6.2,
-               handlelength=0.9, handletextpad=0.3, columnspacing=0.8)
-    fig.subplots_adjust(left=0.14, right=0.99, top=0.88, bottom=0.22, hspace=0.62)
+    ax.legend(handles, [d for _, d in SYS] + ["SLO 100 ms"], loc="lower center",
+              bbox_to_anchor=(0.5, 1.0), ncol=4, frameon=False, fontsize=6.2,
+              handlelength=0.9, handletextpad=0.3, columnspacing=0.7)
+    fig.subplots_adjust(left=0.13, right=0.99, top=0.86, bottom=0.30)
     for e in ("png", "pdf"):
         fig.savefig(f"results/plots/{fname}.{e}", bbox_inches="tight")
     plt.close(fig)

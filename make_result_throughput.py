@@ -136,7 +136,7 @@ def render_combined(fname):
                 else:
                     ax.bar(xx, v, bw, color=COL[sd], edgecolor=EDGE[sd], linewidth=0.4,
                            hatch=HATCH.get(sd), zorder=3)
-        ax.set_ylim(0, 1.12); ax.set_yticks([0, 0.5, 1.0]); ax.tick_params(labelsize=6.5)
+        ax.set_ylim(0, 1.06); ax.set_yticks([0, 0.5, 1.0]); ax.tick_params(labelsize=6.5)
         ax.set_ylabel("Goodput\n/ SPLASH", fontsize=7.0, linespacing=0.9)
         ax.grid(True, axis="y", ls=(0, (4, 3)), lw=0.4, color="#cfcfcf", zorder=0)
         ax.set_axisbelow(True); ax.set_xlim(cen[0] - 0.65, cen[-1] + 0.65)
@@ -146,11 +146,11 @@ def render_combined(fname):
         ax.set_xticks(cen)
         ax.set_xticklabels([w["ctx"] for w in work], fontsize=5.6, rotation=90)
         ax.tick_params(axis="x", pad=1.0)
-        ax.text(0.01, 0.93, f"SLO {slo} ms", transform=ax.transAxes, fontsize=6.5,
-                style="italic", color="#555", ha="left", va="top")
+        ax.set_title(f"SLO {slo} ms", loc="left", fontsize=6.8, style="italic",
+                     color="#555", pad=2.0)
     for m, (_, name) in enumerate(MODELS):
         xc = (cen[m * NCc] + cen[m * NCc + NCc - 1]) / 2
-        axes[1].text(xc, -0.95, name, ha="center", va="top", fontsize=6.8,
+        axes[1].text(xc, -0.52, name, ha="center", va="top", fontsize=6.8,
                      transform=axes[1].get_xaxis_transform())
     handles = [plt.Rectangle((0, 0), 1, 1, fc=COL[sd], ec=EDGE[sd], lw=0.4,
                              hatch=HATCH.get(sd)) for _, sd in SYS]
