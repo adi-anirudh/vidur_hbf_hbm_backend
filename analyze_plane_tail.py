@@ -227,8 +227,8 @@ def main() -> None:
     global_c = ps.COLORS["dense"]
     splash_c = ps.COLORS["splash"]
     sink_c = ps.COLORS["token"]
-    plt.rcParams.update({"axes.titlesize":7.0,"axes.labelsize":6.4,"xtick.labelsize":5.8,"ytick.labelsize":5.8,"legend.fontsize":5.5})
-    fig, axes = plt.subplots(4, 1, figsize=(3.4, 6.9))
+    plt.rcParams.update({"axes.titlesize":7.0,"axes.labelsize":6.4,"xtick.labelsize":5.8,"ytick.labelsize":5.8,"legend.fontsize":6.2})
+    fig, axes = plt.subplots(2, 2, figsize=(3.4, 3.0))
 
     rank = 100 * (np.arange(1024) + 1) / 1024
     for name, color, label in (
@@ -236,36 +236,36 @@ def main() -> None:
         ("splash", splash_c, "SPLASH quota"),
     ):
         normalized = np.sort(loads[name] / loads[name].mean())
-        axes[0].plot(rank, normalized, color=color, lw=1.6, label=label)
-    axes[0].axhspan(0.75, 1.25, color="#777", alpha=0.10)
-    axes[0].axhline(1, color="#555", ls=":", lw=0.9)
-    axes[0].set_xlabel("Planes at or below load percentile (%)")
-    axes[0].set_ylabel("Plane load / mean")
-    axes[0].set_title("(a) Almost all planes stay near the mean")
-    axes[0].legend(frameon=False)
-    ps.finish_axis(axes[0])
+        axes[0, 0].plot(rank, normalized, color=color, lw=1.6, label=label)
+    axes[0, 0].axhspan(0.75, 1.25, color="#777", alpha=0.10)
+    axes[0, 0].axhline(1, color="#555", ls=":", lw=0.9)
+    axes[0, 0].set_xlabel("Planes at or below load percentile (%)")
+    axes[0, 0].set_ylabel("Plane load / mean")
+    axes[0, 0].set_title("(a) Almost all planes stay near the mean")
+    axes[0, 0].legend(frameon=False)
+    ps.finish_axis(axes[0, 0])
 
     tail = order[:32]
     tail_load = loads["splash"][tail] / loads["splash"].mean()
     colors = [sink_c if plane == plane0 else splash_c for plane in tail]
-    axes[1].bar(np.arange(32), tail_load, color=colors, width=0.82)
-    axes[1].axhline(1.25, color="#555", ls=":", lw=0.9)
-    axes[1].set_xticks([0, 7, 15, 23, 31])
-    axes[1].set_xticklabels(["1", "8", "16", "24", "32"])
-    axes[1].set_xlabel("Rank among 32 busiest planes")
-    axes[1].set_ylabel("Plane load / mean")
-    axes[1].set_title("(b) The maximum is one sink-plane impulse")
-    axes[1].annotate(
+    axes[0, 1].bar(np.arange(32), tail_load, color=colors, width=0.82)
+    axes[0, 1].axhline(1.25, color="#555", ls=":", lw=0.9)
+    axes[0, 1].set_xticks([0, 7, 15, 23, 31])
+    axes[0, 1].set_xticklabels(["1", "8", "16", "24", "32"])
+    axes[0, 1].set_xlabel("Rank among 32 busiest planes")
+    axes[0, 1].set_ylabel("Plane load / mean")
+    axes[0, 1].set_title("(b) The maximum is one sink-plane impulse")
+    axes[0, 1].annotate(
         f"plane {plane0}: {tail_load[0]:.2f}×",
         xy=(0, tail_load[0]), xytext=(5, 1.85),
         arrowprops={"arrowstyle": "->", "lw": 0.7},
     )
-    axes[1].annotate(
+    axes[0, 1].annotate(
         f"next: {tail_load[1]:.2f}×",
         xy=(1, tail_load[1]), xytext=(9, 1.48),
         arrowprops={"arrowstyle": "->", "lw": 0.7},
     )
-    ps.finish_axis(axes[1], grid_axis="y")
+    ps.finish_axis(axes[0, 1], grid_axis="y")
 
     thresholds = np.array([1.1, 1.25, 1.5, 1.75, 2.0])
     for name, color, label in (
@@ -274,15 +274,15 @@ def main() -> None:
     ):
         normalized = loads[name] / loads[name].mean()
         fraction = [max(np.mean(normalized >= t), 1e-4) for t in thresholds]
-        axes[2].plot(
+        axes[1, 0].plot(
             thresholds, 100 * np.asarray(fraction), "-o",
             color=color, lw=1.6, ms=3.5, label=label,
         )
-    axes[2].set_yscale("log")
-    axes[2].set_xlabel("Load threshold (× mean)")
-    axes[2].set_ylabel("Planes exceeding threshold (%)")
-    axes[2].set_title("(c) Imbalance is confined to a tiny tail")
-    ps.finish_axis(axes[2])
+    axes[1, 0].set_yscale("log")
+    axes[1, 0].set_xlabel("Load threshold (× mean)")
+    axes[1, 0].set_ylabel("Planes exceeding threshold (%)")
+    axes[1, 0].set_title("(c) Imbalance is confined to a tiny tail")
+    ps.finish_axis(axes[1, 0])
 
     for name, color, label in (
         ("stripe", global_c, "Global top-k + stripe"),
@@ -290,25 +290,25 @@ def main() -> None:
     ):
         values = np.sort(rounds[name])
         cdf = 100 * (np.arange(values.size) + 1) / values.size
-        axes[3].plot(values, cdf, color=color, lw=1.7, label=label)
-    axes[3].axvline(
+        axes[1, 1].plot(values, cdf, color=color, lw=1.7, label=label)
+    axes[1, 1].axvline(
         np.percentile(rounds["stripe"], 99),
         color=global_c, ls=":", lw=0.9,
     )
-    axes[3].axvline(
+    axes[1, 1].axvline(
         np.percentile(rounds["splash"], 99),
         color=splash_c, ls=":", lw=0.9,
     )
-    axes[3].set_xlabel("Serial read rounds / layer-query event")
-    axes[3].set_ylabel("Events completed (%)")
-    axes[3].set_title("(d) Quotas eliminate the serial-read tail")
-    axes[3].legend(frameon=False, loc="lower right")
-    ps.finish_axis(axes[3])
-    axes[3].text(
+    axes[1, 1].set_xlabel("Serial read rounds / layer-query event")
+    axes[1, 1].set_ylabel("Events completed (%)")
+    axes[1, 1].set_title("(d) Quotas eliminate the serial-read tail")
+    axes[1, 1].legend(frameon=False, loc="lower right")
+    ps.finish_axis(axes[1, 1])
+    axes[1, 1].text(
         0.03, 0.72,
         "p99: 98 → 64 rounds\n"
         "99.93% of events improve",
-        transform=axes[3].transAxes,
+        transform=axes[1, 1].transAxes,
         bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.8},
     )
 

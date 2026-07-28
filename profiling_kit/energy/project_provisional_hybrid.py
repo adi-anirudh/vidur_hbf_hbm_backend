@@ -291,7 +291,7 @@ def plot(frame: pd.DataFrame, prefix: Path) -> None:
         "axes.labelsize": 6.6, "xtick.labelsize": 5.8, "ytick.labelsize": 6.0,
         "legend.fontsize": 6.2,
     })
-    fig, axes = plt.subplots(4, 1, figsize=(3.4, 2.95), sharex=True, sharey=True)
+    fig, axes = plt.subplots(2, 2, figsize=(3.4, 2.3), sharex=True, sharey=True)
     x = np.arange(len(contexts))
     width = 0.26
     for ax, (model, model_label) in zip(axes.flat, MODELS):
@@ -317,18 +317,20 @@ def plot(frame: pd.DataFrame, prefix: Path) -> None:
         ax.text(0.015, 0.94, model_label, transform=ax.transAxes, ha="left",
                 va="top", fontsize=6.6, fontweight="bold")
         ps.finish_axis(ax, grid_axis="y")
-    axes[-1].set_xticks(x)
-    axes[-1].set_xticklabels([CONTEXT_LABELS[c] for c in contexts], rotation=45)
-    axes[-1].set_xlabel("Context length")
-    fig.supylabel("Normalized tokens/J", fontsize=6.8, x=0.015)
-    handles, legend_labels = axes[0].get_legend_handles_labels()
+    for ax in axes[1, :]:
+        ax.set_xticks(x)
+        ax.set_xticklabels([CONTEXT_LABELS[c] for c in contexts], rotation=45,
+                           fontsize=5.8)
+    fig.supylabel("Normalized tokens/J", fontsize=6.8, x=0.02)
+    fig.supxlabel("Context length", fontsize=6.6, y=0.005)
+    handles, legend_labels = axes.flat[0].get_legend_handles_labels()
     fig.legend(
         handles, legend_labels, ncol=3, loc="upper center",
-        bbox_to_anchor=(0.5, 1.005), frameon=False, handlelength=1.2,
-        columnspacing=1.2,
+        bbox_to_anchor=(0.5, 1.03), frameon=False, handlelength=1.2,
+        columnspacing=1.2, fontsize=6.5,
     )
-    fig.subplots_adjust(left=0.165, right=0.975, top=0.9, bottom=0.14,
-                        hspace=0.15)
+    fig.subplots_adjust(left=0.17, right=0.98, top=0.85, bottom=0.2,
+                        hspace=0.2, wspace=0.28)
     prefix.parent.mkdir(parents=True, exist_ok=True)
     for suffix in (".png", ".pdf"):
         fig.savefig(prefix.with_suffix(suffix))

@@ -125,73 +125,73 @@ def main() -> None:
     rust = ps.COLORS["dense"]
     gold = ps.COLORS["token"]
     green = ps.COLORS["global"]
-    plt.rcParams.update({"axes.titlesize":7.0,"axes.labelsize":6.4,"xtick.labelsize":5.8,"ytick.labelsize":5.8,"legend.fontsize":5.5})
-    fig, axes = plt.subplots(4, 1, figsize=(3.4, 6.6))
+    plt.rcParams.update({"axes.titlesize":7.0,"axes.labelsize":6.4,"xtick.labelsize":5.8,"ytick.labelsize":5.8,"legend.fontsize":6.2})
+    fig, axes = plt.subplots(2, 2, figsize=(3.4, 3.0))
 
     x = [r["selection_fraction"] * 100 for r in bp]
     y = [r["throughput_per_gpu"] for r in bp]
-    axes[0].plot(x, y, "-o", color=blue, lw=1.8, ms=4)
+    axes[0, 0].plot(x, y, "-o", color=blue, lw=1.8, ms=4)
     last_batch = None
     for r, xx, yy in zip(bp, x, y):
         if r["batch"] != last_batch:
-            axes[0].annotate(
+            axes[0, 0].annotate(
                 f"B={r['batch']}", (xx, yy), xytext=(4, 5),
                 textcoords="offset points", ha="left",
                 fontsize=ps.ANNOTATION_SIZE,
             )
             last_batch = r["batch"]
-    axes[0].set_ylabel("SLO throughput (token/s/GPU)")
-    axes[0].set_title("(a) Selection budget: performance")
+    axes[0, 0].set_ylabel("SLO throughput (token/s/GPU)")
+    axes[0, 0].set_title("(a) Selection budget: performance")
 
     xq = [r["selection_fraction"] * 100 for r in bq]
     yq = [r["ppl_overhead_percent"] for r in bq]
-    axes[1].plot(xq, yq, "-o", color=rust, lw=1.8, ms=4)
-    axes[1].axvline(10, color="#777", ls=":", lw=1)
-    axes[1].annotate(
+    axes[0, 1].plot(xq, yq, "-o", color=rust, lw=1.8, ms=4)
+    axes[0, 1].axvline(10, color="#777", ls=":", lw=1)
+    axes[0, 1].annotate(
         "default", (10, np.interp(10, xq, yq)),
         xytext=(5, 10), textcoords="offset points",
         fontsize=ps.ANNOTATION_SIZE,
     )
-    axes[1].set_ylabel("PG-19 perplexity overhead (%)")
-    axes[1].set_title("(b) Selection budget: quality")
+    axes[0, 1].set_ylabel("PG-19 perplexity overhead (%)")
+    axes[0, 1].set_title("(b) Selection budget: quality")
 
     xp = [r["page_kb"] for r in pp]
     yp = [r["throughput_per_gpu"] for r in pp]
-    axes[2].plot(xp, yp, "-o", color=green, lw=1.8, ms=4)
-    axes[2].set_xscale("log", base=2)
-    axes[2].set_xticks([4, 8, 16, 32])
-    axes[2].set_xticklabels(["4", "8", "16", "32"])
-    axes[2].set_xlabel("Physical HBF page size (KB)")
-    axes[2].set_ylabel("SLO throughput (token/s/GPU)")
-    axes[2].set_ylim(0, max(yp) * 1.12)
-    axes[2].text(
+    axes[1, 0].plot(xp, yp, "-o", color=green, lw=1.8, ms=4)
+    axes[1, 0].set_xscale("log", base=2)
+    axes[1, 0].set_xticks([4, 8, 16, 32])
+    axes[1, 0].set_xticklabels(["4", "8", "16", "32"])
+    axes[1, 0].set_xlabel("Physical HBF page size (KB)")
+    axes[1, 0].set_ylabel("SLO throughput (token/s/GPU)")
+    axes[1, 0].set_ylim(0, max(yp) * 1.12)
+    axes[1, 0].text(
         5.0, max(yp) * 0.82,
         "centroid scan hidden\nby hot-HBM attention",
         color=green, fontsize=ps.ANNOTATION_SIZE,
     )
-    axes[2].set_title("(c) Page size: end-to-end performance")
+    axes[1, 0].set_title("(c) Page size: end-to-end performance")
 
     xr = [r["page_kb"] for r in pq]
     recall = [r["top_budget_token_recall"] * 100 for r in pq]
     metadata = [100 / (2 * r["page_tokens"]) for r in pq]
-    axes[3].plot(
+    axes[1, 1].plot(
         xr, recall, "-o", color=blue, lw=1.8, ms=4,
         label="Top-budget token recall",
     )
-    axes[3].set_xscale("log", base=2)
-    axes[3].set_xticks([4, 8, 16, 32])
-    axes[3].set_xticklabels(["4", "8", "16", "32"])
-    axes[3].set_xlabel("Physical HBF page size (KB)")
-    axes[3].set_ylabel("Top-10% token coverage (%)", color=blue)
-    axes[3].tick_params(axis="y", labelcolor=blue)
-    ax2 = axes[3].twinx()
+    axes[1, 1].set_xscale("log", base=2)
+    axes[1, 1].set_xticks([4, 8, 16, 32])
+    axes[1, 1].set_xticklabels(["4", "8", "16", "32"])
+    axes[1, 1].set_xlabel("Physical HBF page size (KB)")
+    axes[1, 1].set_ylabel("Top-10% token coverage (%)", color=blue)
+    axes[1, 1].tick_params(axis="y", labelcolor=blue)
+    ax2 = axes[1, 1].twinx()
     ax2.plot(
         xr, metadata, "--s", color=gold, lw=1.5, ms=3.5,
         label="Centroid footprint",
     )
     ax2.set_ylabel("Centroids (% of K+V)", color=gold)
     ax2.tick_params(axis="y", labelcolor=gold)
-    axes[3].set_title("(d) Page size: quality vs metadata")
+    axes[1, 1].set_title("(d) Page size: quality vs metadata")
 
     for ax in axes.flat:
         ps.finish_axis(ax)

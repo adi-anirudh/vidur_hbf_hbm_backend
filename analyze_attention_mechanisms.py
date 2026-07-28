@@ -147,10 +147,10 @@ def plot(rows: list[dict]) -> None:
         "SPLASH": ps.COLORS["splash"],
     }
 
-    plt.rcParams.update({"axes.titlesize": 7.0, "axes.labelsize": 6.4,
-                         "xtick.labelsize": 5.8, "ytick.labelsize": 5.8,
-                         "legend.fontsize": 5.5})
-    fig, axes = plt.subplots(2, 1, figsize=(3.4, 4.35))
+    plt.rcParams.update({"axes.titlesize": 6.8, "axes.labelsize": 6.6,
+                         "xtick.labelsize": 6.3, "ytick.labelsize": 6.3,
+                         "legend.fontsize": 6.2})
+    fig, axes = plt.subplots(2, 1, figsize=(3.4, 2.7))
     representative = 1_048_576
     rr = [r for r in rows if r["context_length"] == representative]
     x = np.arange(len(rr))
