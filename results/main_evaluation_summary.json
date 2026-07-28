@@ -1,0 +1,174 @@
+{
+  "source": "results/sweep_b200_weight_valid.csv",
+  "models": [
+    "deepseek-ai/deepseek-llm-67b-chat",
+    "meta-llama/Meta-Llama-3-70B",
+    "meta-llama/Meta-Llama-3-8B",
+    "meta-llama/Meta-Llama-3.1-405B",
+    "mistralai/Mistral-7B-v0.1",
+    "mistralai/Mixtral-8x22B-v0.1",
+    "mistralai/Mixtral-8x7B-v0.1",
+    "microsoft/phi-2",
+    "Qwen/Qwen2-72B",
+    "Qwen/Qwen3-235B-A22B"
+  ],
+  "contexts": [
+    131072,
+    196608,
+    262144,
+    393216,
+    524288,
+    786432,
+    1048576,
+    2097152
+  ],
+  "total_model_context_workloads": 80,
+  "slo": {
+    "50": {
+      "feasible_workloads": {
+        "HBM-only": 75,
+        "Dense": 79,
+        "Naive": 80,
+        "Sparse": 80
+      },
+      "splash_vs_dense": {
+        "paired": 79,
+        "geomean_speedup": 3.7323845201320625,
+        "median_speedup": 3.974667564323918,
+        "maximum_speedup": 7.574041495678591,
+        "splash_only_workloads": 1,
+        "by_context": {
+          "131072": {
+            "paired": 10,
+            "geomean_speedup": 3.1527128580677686,
+            "geomean_concurrency_per_gpu_ratio": 3.249009585424942,
+            "geomean_tpot_ratio": 0.9703612055227041,
+            "splash_only": 0
+          },
+          "196608": {
+            "paired": 10,
+            "geomean_speedup": 4.025105923194912,
+            "geomean_concurrency_per_gpu_ratio": 4.924577653379664,
+            "geomean_tpot_ratio": 0.8173504829256861,
+            "splash_only": 0
+          },
+          "262144": {
+            "paired": 10,
+            "geomean_speedup": 3.3600796436160607,
+            "geomean_concurrency_per_gpu_ratio": 3.4822022531844965,
+            "geomean_tpot_ratio": 0.9649294898201981,
+            "splash_only": 0
+          },
+          "393216": {
+            "paired": 10,
+            "geomean_speedup": 4.154844317929267,
+            "geomean_concurrency_per_gpu_ratio": 4.924577653379664,
+            "geomean_tpot_ratio": 0.8436955634312838,
+            "splash_only": 0
+          },
+          "524288": {
+            "paired": 10,
+            "geomean_speedup": 3.5974469739336836,
+            "geomean_concurrency_per_gpu_ratio": 3.7321319661472296,
+            "geomean_tpot_ratio": 0.9639120498859035,
+            "splash_only": 0
+          },
+          "786432": {
+            "paired": 10,
+            "geomean_speedup": 4.190227209974328,
+            "geomean_concurrency_per_gpu_ratio": 4.924577653379664,
+            "geomean_tpot_ratio": 0.8508805231446877,
+            "splash_only": 0
+          },
+          "1048576": {
+            "paired": 10,
+            "geomean_speedup": 3.5917961342481335,
+            "geomean_concurrency_per_gpu_ratio": 3.4822022531844965,
+            "geomean_tpot_ratio": 1.0314725777238851,
+            "splash_only": 0
+          },
+          "2097152": {
+            "paired": 9,
+            "geomean_speedup": 3.9484369560976345,
+            "geomean_concurrency_per_gpu_ratio": 4.0,
+            "geomean_tpot_ratio": 0.9871092390244085,
+            "splash_only": 1
+          }
+        }
+      }
+    },
+    "100": {
+      "feasible_workloads": {
+        "HBM-only": 75,
+        "Dense": 80,
+        "Naive": 80,
+        "Sparse": 80
+      },
+      "splash_vs_dense": {
+        "paired": 80,
+        "geomean_speedup": 5.6556358798885,
+        "median_speedup": 5.646910616257217,
+        "maximum_speedup": 7.974692272141935,
+        "splash_only_workloads": 0,
+        "by_context": {
+          "131072": {
+            "paired": 10,
+            "geomean_speedup": 5.2473550247811485,
+            "geomean_concurrency_per_gpu_ratio": 4.2870938501451725,
+            "geomean_tpot_ratio": 1.223988839106813,
+            "splash_only": 0
+          },
+          "196608": {
+            "paired": 10,
+            "geomean_speedup": 5.054343009414329,
+            "geomean_concurrency_per_gpu_ratio": 3.7321319661472296,
+            "geomean_tpot_ratio": 1.3542776770115261,
+            "splash_only": 0
+          },
+          "262144": {
+            "paired": 10,
+            "geomean_speedup": 5.754576563189086,
+            "geomean_concurrency_per_gpu_ratio": 4.924577653379664,
+            "geomean_tpot_ratio": 1.168542150866441,
+            "splash_only": 0
+          },
+          "393216": {
+            "paired": 10,
+            "geomean_speedup": 5.399600690480699,
+            "geomean_concurrency_per_gpu_ratio": 4.0,
+            "geomean_tpot_ratio": 1.349900172620175,
+            "splash_only": 0
+          },
+          "524288": {
+            "paired": 10,
+            "geomean_speedup": 5.969571400359392,
+            "geomean_concurrency_per_gpu_ratio": 4.924577653379664,
+            "geomean_tpot_ratio": 1.212199668790391,
+            "splash_only": 0
+          },
+          "786432": {
+            "paired": 10,
+            "geomean_speedup": 5.732839896520511,
+            "geomean_concurrency_per_gpu_ratio": 4.594793419988139,
+            "geomean_tpot_ratio": 1.247681750300606,
+            "splash_only": 0
+          },
+          "1048576": {
+            "paired": 10,
+            "geomean_speedup": 6.025914116455324,
+            "geomean_concurrency_per_gpu_ratio": 4.924577653379664,
+            "geomean_tpot_ratio": 1.2236407953319264,
+            "splash_only": 0
+          },
+          "2097152": {
+            "paired": 10,
+            "geomean_speedup": 6.15935802614072,
+            "geomean_concurrency_per_gpu_ratio": 4.924577653379664,
+            "geomean_tpot_ratio": 1.2507383291872034,
+            "splash_only": 0
+          }
+        }
+      }
+    }
+  }
+}
