@@ -124,7 +124,7 @@ def render_combined(fname):
         x += 1.15
     cen = np.array(cen)
     bw = 0.205
-    fig, axes = plt.subplots(2, 1, figsize=(3.4, 2.5))
+    fig, axes = plt.subplots(2, 1, figsize=(3.4, 2.9))
     for ax, work, slo in ((axes[0], work50, 50), (axes[1], work100, 100)):
         for i, (_, s) in enumerate(SYS):
             xs = cen + (i - 1.5) * bw
@@ -134,26 +134,26 @@ def render_combined(fname):
             for w, xx in zip(work, xs):
                 if w["vals"][s] is None:
                     ax.plot(xx, 0.05, marker="x", color="#d21f1f", ms=2.5, mew=0.9, zorder=6)
-        ax.set_ylim(0, 1.16); ax.set_yticks([0, 0.5, 1.0]); ax.tick_params(labelsize=5.5)
-        ax.set_ylabel("Norm.\nGoodput", fontsize=6.0, linespacing=0.9)
+        ax.set_ylim(0, 1.16); ax.set_yticks([0, 0.5, 1.0]); ax.tick_params(labelsize=6.5)
+        ax.set_ylabel("Norm.\nGoodput", fontsize=7.0, linespacing=0.9)
         ax.grid(True, axis="y", ls=(0, (4, 3)), lw=0.4, color="#cfcfcf", zorder=0)
         ax.set_axisbelow(True); ax.set_xlim(cen[0] - 0.65, cen[-1] + 0.65)
         for sp in ("top", "right"): ax.spines[sp].set_visible(False)
         for m in range(1, len(MODELS)):
             ax.axvline((cen[m * NCc - 1] + cen[m * NCc]) / 2, color="#dddddd", lw=0.5, zorder=1)
-        ax.set_xticks(cen); ax.set_xticklabels([w["ctx"] for w in work], fontsize=3.9)
+        ax.set_xticks(cen); ax.set_xticklabels([w["ctx"] for w in work], fontsize=6.0, rotation=90)
         ax.tick_params(axis="x", pad=1.0)
-        ax.text(0.004, 0.97, f"SLO {slo} ms", transform=ax.transAxes, fontsize=5.2,
+        ax.text(0.01, 0.95, f"SLO {slo} ms", transform=ax.transAxes, fontsize=6.5,
                 style="italic", color="#555", ha="left", va="top")
     for m, (_, name) in enumerate(MODELS):
         xc = (cen[m * NCc] + cen[m * NCc + NCc - 1]) / 2
-        axes[1].text(xc, -0.36, name, ha="center", va="top", fontsize=5.0,
+        axes[1].text(xc, -0.85, name, ha="center", va="top", fontsize=6.8,
                      transform=axes[1].get_xaxis_transform())
     h, l = axes[0].get_legend_handles_labels()
     fig.legend(h, l, loc="upper center", bbox_to_anchor=(0.5, 1.03), ncol=4,
-               frameon=False, fontsize=5.2, handlelength=0.8, handletextpad=0.3,
+               frameon=False, fontsize=6.8, handlelength=0.9, handletextpad=0.3,
                columnspacing=0.7)
-    fig.subplots_adjust(left=0.12, right=0.99, top=0.9, bottom=0.14, hspace=0.3)
+    fig.subplots_adjust(left=0.14, right=0.99, top=0.92, bottom=0.2, hspace=0.42)
     for e in ("png", "pdf"):
         fig.savefig(f"results/plots/{fname}.{e}", bbox_inches="tight")
     plt.close(fig)

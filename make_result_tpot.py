@@ -119,7 +119,7 @@ def render(pi, plabel, fname):
 def render_combined(fname):
     """p50 (top) + p99 (bottom) sharing ONE legend and ONE x-axis. Single column."""
     bw = 0.235; YMAX = 400
-    fig, axes = plt.subplots(2, 1, figsize=(3.4, 2.35), sharex=True)
+    fig, axes = plt.subplots(2, 1, figsize=(3.4, 2.75), sharex=True)
     for ax, pi, plabel in ((axes[0], 0, "p50"), (axes[1], 1, "p99")):
         for i, (sk, _) in enumerate(SYS):
             xs = centers + (i - 1) * bw
@@ -130,8 +130,8 @@ def render_combined(fname):
                 ax.bar(xx, min(v[pi], YMAX), bw, color=COL[sk], edgecolor=EDGE[sk],
                        linewidth=0.4, hatch=HATCH.get(sk), zorder=3)
         ax.axhline(SLO, ls=(0, (4, 2)), lw=0.8, color="#d21f1f", zorder=4)
-        ax.set_ylim(0, YMAX); ax.set_yticks([0, 200, 400]); ax.tick_params(labelsize=5.5)
-        ax.set_ylabel(f"{plabel} TPOT\n(ms)", fontsize=6.0, linespacing=0.9)
+        ax.set_ylim(0, YMAX); ax.set_yticks([0, 200, 400]); ax.tick_params(labelsize=6.5)
+        ax.set_ylabel(f"{plabel} TPOT\n(ms)", fontsize=7.0, linespacing=0.9)
         ax.grid(True, axis="y", ls=(0, (4, 3)), lw=0.4, color="#cfcfcf", zorder=0)
         ax.set_axisbelow(True)
         ax.set_xlim(centers[0] - 0.65, centers[-1] + 0.65)
@@ -140,19 +140,19 @@ def render_combined(fname):
             ax.axvline((centers[m * NC - 1] + centers[m * NC]) / 2, color="#dddddd",
                        lw=0.5, zorder=1)
     axes[1].set_xticks(centers)
-    axes[1].set_xticklabels([w["ctx"] for w in work], fontsize=3.9)
+    axes[1].set_xticklabels([w["ctx"] for w in work], fontsize=6.0, rotation=90)
     axes[1].tick_params(axis="x", pad=1.0)
     for m, (_, name) in enumerate(MODELS):
         xc = (centers[m * NC] + centers[m * NC + NC - 1]) / 2
-        axes[1].text(xc, -0.30, name, ha="center", va="top", fontsize=5.0,
-                     transform=axes[1].get_xaxis_transform())
+        axes[1].text(xc, -0.62, name, ha="center", va="top", fontsize=6.8,
+                     transform=axes[1].get_xaxis_transform())  # model
     handles = [plt.Rectangle((0, 0), 1, 1, fc=COL[s], ec=EDGE[s], lw=0.4,
                              hatch=HATCH.get(s)) for s, _ in SYS]
     handles.append(plt.Line2D([], [], ls=(0, (4, 2)), color="#d21f1f", lw=0.8))
     fig.legend(handles, [d for _, d in SYS] + ["SLO 100 ms"], loc="upper center",
-               bbox_to_anchor=(0.5, 1.03), ncol=4, frameon=False, fontsize=5.4,
+               bbox_to_anchor=(0.5, 1.03), ncol=4, frameon=False, fontsize=6.8,
                handlelength=0.9, handletextpad=0.3, columnspacing=0.8)
-    fig.subplots_adjust(left=0.125, right=0.99, top=0.9, bottom=0.14, hspace=0.12)
+    fig.subplots_adjust(left=0.14, right=0.99, top=0.9, bottom=0.2, hspace=0.14)
     for e in ("png", "pdf"):
         fig.savefig(f"results/plots/{fname}.{e}", bbox_inches="tight")
     plt.close(fig)
