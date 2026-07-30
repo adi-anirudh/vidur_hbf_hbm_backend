@@ -1,0 +1,820 @@
+{
+  "schema_version": 2,
+  "status": "component_complete_measurement_anchored_form",
+  "selected_operating_points": 96,
+  "model_context_pairs": 32,
+  "selection": "maximum tokens/s/GPU under the 100 ms TPOT SLO after requiring weights plus 4 GB reserve to fit in per-GPU HBM",
+  "coefficients": {
+    "gpu_board_w": 700.0,
+    "hbm_pj_per_byte": 11.93,
+    "hbf_read_pj_per_byte": 64.0,
+    "hbf_program_read_ratio": 10.0,
+    "hbf_erase_uj_per_block": 300.0,
+    "pages_per_block": 256,
+    "sram_bridge_pj_per_byte": 1.0,
+    "d2d_link_pj_per_byte": 1.0,
+    "nma_pj_per_mac": 0.2
+  },
+  "provenance": {
+    "gpu_board_w": "swept 450-1000 W. MEASURED anchor: 192.4 W dynamic for attention decode on an RTX PRO 6000 Blackwell (600 W part, 32% of TDP); the same ratio on a 1000 W B200 plus static lands near 470 W, so 700 W is conservative",
+    "hbm_pj_per_byte": "DIAGNOSTIC ONLY, inside the board term. Ujeniya et al. arXiv:2604.11391 H100 rail, activity-attributed (results/energy_h100/source_calibrated_separation.json); high case 23.9 pJ/B = FlashAccel's cited HBM3e 2.99 pJ/bit",
+    "gpu_board_form": "MEASURED: P*t predicts dynamic board energy to 0.61% wAPE over 132 Blackwell attention-decode shapes (n=132). A bytes-linear form fits to 0.65%; corr(bytes,time)=0.999998 so they are not separable and the HBM/logic split is not identifiable from board telemetry",
+    "hbf_read_pj_per_byte": "8 pJ/bit; independently matches FlashAccel Table 2",
+    "hbf_program_read_ratio": "HBFSim energy_table.toml, 100 us program vs 10 us read per op",
+    "hbf_erase_uj_per_block": "HBFSim energy_table.toml",
+    "sram_bridge_pj_per_byte": "HBFSim interconnect_pj_per_byte, CACTI-class large SRAM",
+    "d2d_link_pj_per_byte": "HBFSim host_bus_pj_per_byte, short-reach on-package D2D",
+    "nma_pj_per_mac": "FP16 MAC at 16 nm"
+  },
+  "included": [
+    "GPU board power x execution time (measurement-validated form)",
+    "HBF array reads including the centroid scan (SPLASH) and the full-key selection scan (Naive Sparse)",
+    "HBF program and erase for KV offload",
+    "SRAM protocol bridge",
+    "HBF-to-GPU D2D link",
+    "NMA MAC array"
+  ],
+  "omitted": [
+    "FTL control logic",
+    "cooling and host energy"
+  ],
+  "baseline_case": {
+    "dense_over_splash": 5.783041205585203,
+    "naive_over_splash": 3.818737249601789,
+    "pairs": 32
+  },
+  "sensitivity_cases": [
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.799467142657245,
+      "naive_over_splash": 3.7245860968916475,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.806158336037486,
+      "naive_over_splash": 3.721185854104073,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.819350205118563,
+      "naive_over_splash": 3.714488396527469,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.798530876862836,
+      "naive_over_splash": 3.7240490885946658,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.805225485321909,
+      "naive_over_splash": 3.7206519942019476,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.8184241113394854,
+      "naive_over_splash": 3.713960722528856,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.796659547787315,
+      "naive_over_splash": 3.7229757778843973,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.803360975965558,
+      "naive_over_splash": 3.719584972604942,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.816573095395441,
+      "naive_over_splash": 3.7129060577655375,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.751752322882777,
+      "naive_over_splash": 4.01529281598873,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.757540268276304,
+      "naive_over_splash": 4.01137789397265,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.768979788847214,
+      "naive_over_splash": 4.0036435719773,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.7502075370508265,
+      "naive_over_splash": 4.01431998785945,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.7560000017945265,
+      "naive_over_splash": 4.010409974859782,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.767448486381707,
+      "naive_over_splash": 4.00268532603689,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.747121239529257,
+      "naive_over_splash": 4.012376436534087,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.752922720048264,
+      "naive_over_splash": 4.00847622241721,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.764389087547175,
+      "naive_over_splash": 4.00077088242268,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.718751952345018,
+      "naive_over_splash": 4.2249177341683435,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.723840791762992,
+      "naive_over_splash": 4.220894240205954,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.733916115921958,
+      "naive_over_splash": 4.212930060827825,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.716776031127602,
+      "naive_over_splash": 4.22359246270764,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.721869708143319,
+      "naive_over_splash": 4.2195748220364715,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.73195464256446,
+      "naive_over_splash": 4.211622200613354,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.71282954867798,
+      "naive_over_splash": 4.220945584154635,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.717932869356742,
+      "naive_over_splash": 4.216939621384664,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 450.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.728036962073369,
+      "naive_over_splash": 4.209010059511551,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.818030633453446,
+      "naive_over_splash": 3.5937004087593376,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.822619547640967,
+      "naive_over_splash": 3.591740546731648,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.831705652457589,
+      "naive_over_splash": 3.5878633512751077,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.817376564741405,
+      "naive_over_splash": 3.593341411228891,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.821967171347016,
+      "naive_over_splash": 3.591382992463748,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.8310566347337005,
+      "naive_over_splash": 3.5875086480282596,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.816069014869486,
+      "naive_over_splash": 3.5926237466492275,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.8206630026955235,
+      "naive_over_splash": 3.5906682119045716,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.829759176094047,
+      "naive_over_splash": 3.5867995645892097,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.780025200281465,
+      "naive_over_splash": 3.821754452226602,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.784176468573395,
+      "naive_over_splash": 3.8194090534416487,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.792406659826124,
+      "naive_over_splash": 3.8147612918390124,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.778887436232528,
+      "naive_over_splash": 3.8210802023446173,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.783041205585203,
+      "naive_over_splash": 3.818737249601789,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.791276366997131,
+      "naive_over_splash": 3.8140943270559338,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.776613685445588,
+      "naive_over_splash": 3.8197327795828335,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.780772447588096,
+      "naive_over_splash": 3.8173947117433,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.789017530880222,
+      "naive_over_splash": 3.812761453166948,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.751125919092698,
+      "naive_over_splash": 4.000998616417966,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.754908993807247,
+      "naive_over_splash": 3.9984736980921443,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.762416676816886,
+      "naive_over_splash": 3.9934643198358573,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.749613886204619,
+      "naive_over_splash": 4.000050117804874,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.75339985476479,
+      "naive_over_splash": 3.99752832523711,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.760913294073757,
+      "naive_over_splash": 3.992525137964623,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.746592959531566,
+      "naive_over_splash": 3.998155131106572,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.7503847013857445,
+      "naive_over_splash": 3.995639578084159,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 700.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.757909624800035,
+      "naive_over_splash": 3.9906487491597282,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.829597664352503,
+      "naive_over_splash": 3.5138527749145014,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.832928914183068,
+      "naive_over_splash": 3.5125998907935045,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.8395423610805235,
+      "naive_over_splash": 3.5101144769354358,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.829117154374756,
+      "naive_over_splash": 3.5135962507402665,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.832449326510143,
+      "naive_over_splash": 3.51234411485196,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.839064607265968,
+      "naive_over_splash": 3.5098601839462416,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.828156451775825,
+      "naive_over_splash": 3.5130833761634372,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.8314904670727055,
+      "naive_over_splash": 3.511832735774723,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 32.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.8381094126798025,
+      "naive_over_splash": 3.509351768866968,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.7993158627580845,
+      "naive_over_splash": 3.693641079327442,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.802413052399024,
+      "naive_over_splash": 3.6921287996181475,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.80856628716275,
+      "naive_over_splash": 3.6891257215361644,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.798450679468823,
+      "naive_over_splash": 3.6931495028175716,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.801549335677458,
+      "naive_over_splash": 3.6916385549422706,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.8077054888458575,
+      "naive_over_splash": 3.6886381186290054,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.79672134127833,
+      "naive_over_splash": 3.6921669479969434,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.79982292646446,
+      "naive_over_splash": 3.690658660768089,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 64.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.805984908204259,
+      "naive_over_splash": 3.6876635020192037,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.774763671699212,
+      "naive_over_splash": 3.8432888491254897,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.777653558687358,
+      "naive_over_splash": 3.841621215025885,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 5.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.783398357308307,
+      "naive_over_splash": 3.838307154860886,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.773582506020337,
+      "naive_over_splash": 3.842583751161194,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.7764741875945225,
+      "naive_over_splash": 3.840917895988784,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 10.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.782222559567212,
+      "naive_over_splash": 3.8376073668537374,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 0.5,
+      "dense_over_splash": 5.771222091038614,
+      "naive_over_splash": 3.8411747248020025,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 1.0,
+      "dense_over_splash": 5.774117354821257,
+      "naive_over_splash": 3.839512422069678,
+      "pairs": 32
+    },
+    {
+      "gpu_board_w": 1000.0,
+      "hbf_read_pj_per_byte": 96.0,
+      "hbf_program_read_ratio": 20.0,
+      "sram_bridge_pj_per_byte": 2.0,
+      "dense_over_splash": 5.779872859686573,
+      "naive_over_splash": 3.8362089442801492,
+      "pairs": 32
+    }
+  ],
+  "sensitivity_envelope": {
+    "dense_over_splash_min": 5.71282954867798,
+    "dense_over_splash_max": 5.8395423610805235,
+    "naive_over_splash_min": 3.509351768866968,
+    "naive_over_splash_max": 4.2249177341683435
+  },
+  "component_share_percent": {
+    "e_gpu_board": {
+      "Dense": 77.356,
+      "Naive": 66.564,
+      "Sparse": 75.927
+    },
+    "e_hbf_read": {
+      "Dense": 21.63,
+      "Naive": 32.794,
+      "Sparse": 23.207
+    },
+    "e_hbf_program": {
+      "Dense": 0.0,
+      "Naive": 0.002,
+      "Sparse": 0.02
+    },
+    "e_hbf_erase": {
+      "Dense": 0.0,
+      "Naive": 0.001,
+      "Sparse": 0.009
+    },
+    "e_bridge": {
+      "Dense": 0.676,
+      "Naive": 0.426,
+      "Sparse": 0.553
+    },
+    "e_link": {
+      "Dense": 0.338,
+      "Naive": 0.213,
+      "Sparse": 0.276
+    },
+    "e_nma": {
+      "Dense": 0.0,
+      "Naive": 0.0,
+      "Sparse": 0.009
+    }
+  }
+}
